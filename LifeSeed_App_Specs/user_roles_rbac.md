@@ -32,6 +32,8 @@
 | `BANK_MATCHING_OPS` | Match execution · manual overrides · engine config | Global |
 | `BANK_CLINICAL_REVIEWER` | Gate reviews · Eligibility Board · genetic counselling triage | Global |
 | `BANK_FINANCE` | Ledger · invoicing · reconciliation · honorarium · refunds | Site-level |
+| `BANK_CFO` | Approval matrix tier for credit notes / refunds (₹5L–₹25L) | Site-level |
+| `BANK_SITE_HEAD` | Site-level approval equivalent for credit notes / refunds (₹5L–₹25L) | Site-level |
 | `BANK_COMPLIANCE` | Registry sync · DPIA · audit trails · ART Act reporting · AE monitoring | Global · read all with audit stamp |
 | `BANK_DISPATCH_COORD` | Cold-chain booking · courier management · dispatch queue · donor travel logistics | Site-level |
 | `BANK_SITE_ADMIN` | Site-level config: package tiers, photo config, engine subs, contracts | Site-level |
@@ -75,7 +77,8 @@ BANK_LAB_HEAD: dispatch.exception.approve
 ```
 BANK_FINANCE: challan.*, invoice.*, payment.*, credit_note.create (up to tier), refund.initiate
 BANK_SITE_ADMIN: financial_model.assign, payment_terms.override
-CFO or SITE_HEAD: credit_note.approve.tier2, refund.approve.5L_25L
+BANK_CFO: credit_note.approve.tier2, refund.approve.5L_25L
+BANK_SITE_HEAD: credit_note.approve.tier2, refund.approve.5L_25L
 BANK_SUPER_ADMIN: credit_note.approve.tier3, refund.approve.above_25L, gstin.manage
 BANK_COMPLIANCE: gst_return.file, tds_form.file, e_invoice.enable
 ```

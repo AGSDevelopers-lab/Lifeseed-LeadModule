@@ -12,7 +12,7 @@ Rules + prompt templates + anti-patterns for building LifeSeed app in Cursor wit
 - For any feature, reference the relevant module spec (01–06) in LifeSeed_App_Specs/
 
 ## Stack
-- Next.js 14 (App Router) + TypeScript strict mode
+- Next.js 16.3+ (App Router) + TypeScript strict mode
 - Prisma + Postgres (Supabase-hosted)
 - Supabase Auth (multi-tenant + RBAC via ROLE_PERMISSIONS)
 - shadcn/ui + Tailwind CSS
@@ -25,7 +25,7 @@ Rules + prompt templates + anti-patterns for building LifeSeed app in Cursor wit
 - All API routes call requirePermission() from src/lib/rbac.ts
 - All Prisma writes go through auditLog middleware
 - All state transitions use dedicated state machine service (not inline updates)
-- All money values in Float · display formatting at UI layer
+- All money values in Prisma Decimal (@db.Decimal(19,4)) · display formatting at UI layer
 - All timestamps in UTC · convert to IST for display
 - All IDs are cuid · never expose auto-incrementing IDs in URLs
 

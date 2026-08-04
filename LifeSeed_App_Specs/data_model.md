@@ -85,6 +85,8 @@ enum UserRole {
   BANK_MATCHING_OPS
   BANK_CLINICAL_REVIEWER
   BANK_FINANCE
+  BANK_CFO
+  BANK_SITE_HEAD
   BANK_COMPLIANCE
   BANK_DISPATCH_COORD
   BANK_SITE_ADMIN
@@ -401,6 +403,7 @@ model Clinic {
 
   contract        ClinicContract?
   users           User[]
+  recipients      Recipient[]
   drfs            DRF[]
   dispatches      DispatchOrder[]
 
@@ -416,8 +419,8 @@ model ClinicContract {
   advancePolicy   String          @default("PAY_ON_INVOICE")  // PAY_ON_INVOICE, ADVANCE_SPLIT, PACKAGE_SPLIT
   advanceSplitPct Int?            // e.g. 40
   markupCapPct    Int?            // for Model B/C
-  creditLimit     Float?
-  badDebtThreshold Float?
+  creditLimit     Decimal?  @db.Decimal(19, 4)
+  badDebtThreshold Decimal? @db.Decimal(19, 4)
   escalationEmail String?
   courierVendor   String?
   isActive        Boolean         @default(true)
@@ -600,9 +603,9 @@ model SKU {
   description   String
   type          String   // TXN | RECUR
   hsnSacCode    String
-  gstRatePct    Float    @default(18)
+  gstRatePct    Decimal  @default(18) @db.Decimal(19, 4)
   revenueClass  String
-  defaultPrice  Float
+  defaultPrice  Decimal  @db.Decimal(19, 4)
   isActive      Boolean  @default(true)
 }
 
@@ -622,10 +625,10 @@ model Challan {
   buyerType     String        // CLINIC | RECIPIENT
   buyerId       String
 
-  totalValue    Float
-  taxableValue  Float
-  totalGst      Float
-  totalWithGst  Float
+  totalValue    Decimal  @db.Decimal(19, 4)
+  taxableValue  Decimal  @db.Decimal(19, 4)
+  totalGst      Decimal  @db.Decimal(19, 4)
+  totalWithGst  Decimal  @db.Decimal(19, 4)
 
   state         DocumentState @default(ISSUED)
   issuedAt      DateTime      @default(now())
@@ -642,15 +645,15 @@ model ChallanLineItem {
   challan       Challan  @relation(fields: [challanId], references: [id])
   skuCode       String
   description   String
-  quantity      Float
-  unitPrice     Float
-  discount      Float    @default(0)
-  taxableValue  Float
-  gstRatePct    Float
-  igst          Float    @default(0)
-  cgst          Float    @default(0)
-  sgst          Float    @default(0)
-  lineTotal     Float
+  quantity      Decimal  @db.Decimal(19, 4)
+  unitPrice     Decimal  @db.Decimal(19, 4)
+  discount      Decimal  @default(0) @db.Decimal(19, 4)
+  taxableValue  Decimal  @db.Decimal(19, 4)
+  gstRatePct    Decimal  @db.Decimal(19, 4)
+  igst          Decimal  @default(0) @db.Decimal(19, 4)
+  cgst          Decimal  @default(0) @db.Decimal(19, 4)
+  sgst          Decimal  @default(0) @db.Decimal(19, 4)
+  lineTotal     Decimal  @db.Decimal(19, 4)
 }
 
 model Invoice {
@@ -671,13 +674,13 @@ model Invoice {
   buyerId       String
   placeOfSupplyStateCode String
 
-  totalValue    Float
-  taxableValue  Float
-  totalGst      Float
-  totalWithGst  Float
-  tdsAmount     Float @default(0)
-  tcsAmount     Float @default(0)
-  netPayable    Float
+  totalValue    Decimal  @db.Decimal(19, 4)
+  taxableValue  Decimal  @db.Decimal(19, 4)
+  totalGst      Decimal  @db.Decimal(19, 4)
+  totalWithGst  Decimal  @db.Decimal(19, 4)
+  tdsAmount     Decimal  @default(0) @db.Decimal(19, 4)
+  tcsAmount     Decimal  @default(0) @db.Decimal(19, 4)
+  netPayable    Decimal  @db.Decimal(19, 4)
 
   paymentTerms  String
   dueDate       DateTime
@@ -703,15 +706,15 @@ model InvoiceLineItem {
   invoice       Invoice  @relation(fields: [invoiceId], references: [id])
   skuCode       String
   description   String
-  quantity      Float
-  unitPrice     Float
-  discount      Float    @default(0)
-  taxableValue  Float
-  gstRatePct    Float
-  igst          Float    @default(0)
-  cgst          Float    @default(0)
-  sgst          Float    @default(0)
-  lineTotal     Float
+  quantity      Decimal  @db.Decimal(19, 4)
+  unitPrice     Decimal  @db.Decimal(19, 4)
+  discount      Decimal  @default(0) @db.Decimal(19, 4)
+  taxableValue  Decimal  @db.Decimal(19, 4)
+  gstRatePct    Decimal  @db.Decimal(19, 4)
+  igst          Decimal  @default(0) @db.Decimal(19, 4)
+  cgst          Decimal  @default(0) @db.Decimal(19, 4)
+  sgst          Decimal  @default(0) @db.Decimal(19, 4)
+  lineTotal     Decimal  @db.Decimal(19, 4)
 }
 
 model Payment {
@@ -719,7 +722,7 @@ model Payment {
   paymentNumber String      @unique
   invoiceId     String
   invoice       Invoice     @relation(fields: [invoiceId], references: [id])
-  amount        Float
+  amount        Decimal     @db.Decimal(19, 4)
   mode          PaymentMode
   gateway       String?     // RAZORPAY | PAYU | BANK_DIRECT
   gatewayTxnId  String?
@@ -734,7 +737,7 @@ model CreditNote {
   creditNoteNumber String @unique  // LIF/{Site}/CN/{FY}/{seq}
   invoiceId     String
   invoice       Invoice  @relation(fields: [invoiceId], references: [id])
-  amount        Float
+  amount        Decimal  @db.Decimal(19, 4)
   reasonCode    String   // AUTO_RULE_XXX | MANUAL_XXX
   reasonNote    String?
   approvedBy    String?  // user id if manual
@@ -763,7 +766,7 @@ model Subscription {
   autoPayEnabled Boolean          @default(false)
   autoPayMandateId String?
   quantity      Int               @default(1)   // e.g., number of vials for storage
-  unitAmount    Float
+  unitAmount    Decimal           @db.Decimal(19, 4)
 }
 
 // ===== EMBRYOLOGY =====
@@ -861,7 +864,7 @@ model EventEmission {
 
 1. **All IDs are cuid** (Prisma default `cuid()`) — Postgres-friendly, URL-safe, no auto-increment leakage.
 2. **All timestamps are UTC** — display in local TZ at UI layer only.
-3. **All money in Float** (application-layer rounding) — for MVP. Consider decimal library if precision matters at scale.
+3. **All money in Decimal** (`@db.Decimal(19, 4)` → Postgres `NUMERIC(19,4)`) — required for GST 3-way splits (IGST/CGST/SGST) + TDS/TCS. Never use Float for money. Lab/scientific measurements remain `Float`.
 4. **All state fields are enums** — Prisma-typed, PostgreSQL enum-backed. Add new states via Prisma migration.
 5. **Multi-tenancy via `siteId`** — every top-level record scoped to a Site. Enforce at middleware level via `session.siteId` filter.
 6. **Audit trail** — every write action creates an AuditLog entry via a Prisma middleware. `hashChain` builds a Merkle chain per site for tamper-evidence.

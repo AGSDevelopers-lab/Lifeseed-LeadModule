@@ -19,7 +19,7 @@
 - All API routes call requirePermission() from src/lib/rbac.ts
 - All Prisma writes go through auditLog middleware
 - All state transitions use dedicated state machine service
-- All money values in Float · display formatting at UI layer
+- All money values in Prisma Decimal (@db.Decimal(19,4)) · display formatting at UI layer
 - All timestamps in UTC · convert to IST for display
 - All IDs are cuid · never expose auto-increment IDs
 

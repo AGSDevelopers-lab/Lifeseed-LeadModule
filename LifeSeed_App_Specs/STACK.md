@@ -6,11 +6,11 @@ Bootstrap-friendly stack chosen for solo-founder-with-AI build. Every choice opt
 
 | Layer | Choice | Why |
 |---|---|---|
-| **Frontend framework** | Next.js 14 (App Router) + TypeScript | Full-stack in one repo · SSR + API routes · huge Cursor training data |
+| **Frontend framework** | Next.js 16.3+ (App Router) + TypeScript | Full-stack in one repo · SSR + API routes · huge Cursor training data |
 | **UI components** | shadcn/ui + Tailwind CSS | Copy-paste components you own · matches HTML spec look-and-feel |
 | **Forms + Validation** | react-hook-form + zod | Type-safe forms · schema-first validation matches data_model.md |
 | **Database** | Postgres via Supabase (managed) | Free tier for dev · migrate to self-host anytime · Row-Level Security |
-| **ORM** | Prisma | Type-safe · migrations · matches Cursor-friendly schema syntax |
+| **ORM** | Prisma 6 | Type-safe · migrations · matches Cursor-friendly schema syntax · `url`/`directUrl` in schema |
 | **Auth** | Supabase Auth OR Clerk | Multi-tenant · RBAC-ready · Aadhaar-eSign integrable |
 | **File Storage** | Supabase Storage (dev) · migrate to S3 later | Videos (QC-A5), QR assets, PDF challans, e-sign docs |
 | **Payments** | Razorpay SDK (already registered) | Cards / UPI / Netbanking / EMI · Subscriptions API |
@@ -88,20 +88,22 @@ lifeseed-app/
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "lint": "eslint",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
+    "db:generate": "prisma generate",
     "db:studio": "prisma studio"
   },
   "dependencies": {
-    "next": "^14.2.0",
-    "react": "^18.3.0",
-    "react-dom": "^18.3.0",
+    "next": "16.3.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "typescript": "^5.4.0",
-    "@prisma/client": "^5.14.0",
-    "prisma": "^5.14.0",
+    "@prisma/client": "^6.0.0",
+    "prisma": "^6.0.0",
     "@supabase/supabase-js": "^2.43.0",
     "@supabase/ssr": "^0.3.0",
-    "tailwindcss": "^3.4.0",
+    "tailwindcss": "^4.0.0",
     "react-hook-form": "^7.51.0",
     "zod": "^3.23.0",
     "@hookform/resolvers": "^3.4.0",
@@ -116,9 +118,9 @@ lifeseed-app/
   },
   "devDependencies": {
     "@types/node": "^20.12.0",
-    "@types/react": "^18.3.0",
-    "eslint": "^8.57.0",
-    "eslint-config-next": "^14.2.0"
+    "@types/react": "^19.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "16.3.0"
   }
 }
 ```
