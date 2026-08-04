@@ -1,0 +1,37 @@
+﻿# LifeSeed ART Bank Application
+
+## Context loading (always)
+- Read LifeSeed_App_Specs/data_model.md and LifeSeed_App_Specs/user_roles_rbac.md before generating any code
+- For any feature, reference the relevant module spec (01-06) in LifeSeed_App_Specs/
+- Follow patterns in LifeSeed_App_Specs/cursor_workflow.md
+
+## Stack
+- Next.js 16 (App Router) + TypeScript strict mode
+- Prisma + Postgres (Supabase-hosted)
+- Supabase Auth (multi-tenant + RBAC)
+- shadcn/ui + Tailwind CSS
+- react-hook-form + zod for all forms
+- Zustand for client state · React Query for server state
+
+## Coding conventions
+- No `any` types — use `unknown` + narrow, or generate proper types from Prisma
+- All API routes return typed Response
+- All API routes call requirePermission() from src/lib/rbac.ts
+- All Prisma writes go through auditLog middleware
+- All state transitions use dedicated state machine service
+- All money values in Float · display formatting at UI layer
+- All timestamps in UTC · convert to IST for display
+- All IDs are cuid · never expose auto-increment IDs
+
+## Never do these
+- Never generate placeholder / mock data — use SKU catalogue + example rows from specs
+- Never call Prisma directly from components — always through /api routes
+- Never bypass requirePermission() checks
+- Never skip auditLog middleware
+- Never hardcode business rule thresholds — read from admin config
+
+## Compliance non-negotiables
+- ART Act 2021 · DPDP Act 2023 · NABL 112 · GST · Aadhaar eSign
+- 2-witness attestation on critical operations
+- Immutable audit trail with cryptographic hash chain
+- PII (Aadhaar) hashed at rest · masked in display
