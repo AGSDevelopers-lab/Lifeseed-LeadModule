@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, LogOut, Users, UserRound } from "lucide-react";
+import {
+  FlaskConical,
+  LayoutDashboard,
+  LogOut,
+  Settings2,
+  Snowflake,
+  Users,
+  UserRound,
+} from "lucide-react";
 
 import { useRoleContext } from "@/components/auth/role-provider";
 import { Button } from "@/components/ui/primitives";
@@ -10,24 +18,50 @@ import { createClient } from "@/lib/supabase/client";
 import { portalForRole, type PortalKind } from "@/lib/rbac-permissions";
 import { cn } from "@/lib/utils";
 
-const NAV: Record<
-  PortalKind,
-  Array<{ href: string; label: string; icon?: "dash" | "users" | "donors" }>
-> = {
+type NavIconKind =
+  | "dash"
+  | "users"
+  | "donors"
+  | "samples"
+  | "cryo"
+  | "config";
+
+type NavItem = {
+  href: string;
+  label: string;
+  icon?: NavIconKind;
+  children?: Array<{ href: string; label: string }>;
+};
+
+const NAV: Record<PortalKind, NavItem[]> = {
   admin: [
     { href: "/admin", label: "Dashboard", icon: "dash" },
     { href: "/admin/users", label: "Users", icon: "users" },
     { href: "/admin/donors", label: "Donors", icon: "donors" },
+    { href: "/admin/samples", label: "Samples", icon: "samples" },
+    { href: "/admin/cryobank", label: "Cryobank", icon: "cryo" },
+    {
+      href: "/admin/config",
+      label: "Config",
+      icon: "config",
+      children: [
+        { href: "/admin/config/qc-gates", label: "QC Gates" },
+        { href: "/admin/config/categories", label: "Categories" },
+      ],
+    },
   ],
   clinic: [{ href: "/clinic", label: "Dashboard", icon: "dash" }],
   donor: [{ href: "/donor", label: "Dashboard", icon: "dash" }],
   recipient: [{ href: "/recipient", label: "Dashboard", icon: "dash" }],
 };
 
-function NavIcon({ kind }: { kind?: "dash" | "users" | "donors" }) {
+function NavIcon({ kind }: { kind?: NavIconKind }) {
   const className = "h-4 w-4 shrink-0 opacity-70";
   if (kind === "users") return <Users className={className} />;
   if (kind === "donors") return <UserRound className={className} />;
+  if (kind === "samples") return <FlaskConical className={className} />;
+  if (kind === "cryo") return <Snowflake className={className} />;
+  if (kind === "config") return <Settings2 className={className} />;
   return <LayoutDashboard className={className} />;
 }
 
@@ -68,17 +102,35 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
             const active =
               pathname === link.href || pathname.startsWith(`${link.href}/`);
             return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={cn(
-                  "flex items-center gap-2 rounded-md px-3 py-2 text-sm text-stone-700 hover:bg-stone-100",
-                  active && "bg-emerald-50 font-medium text-emerald-900",
+              <div key={link.href}>
+                <Link
+                  href={link.children?.[0]?.href ?? link.href}
+                  className={cn(
+                    "flex items-center gap-2 rounded-md px-3 py-2 text-sm text-stone-700 hover:bg-stone-100",
+                    active && "bg-emerald-50 font-medium text-emerald-900",
+                  )}
+                >
+                  <NavIcon kind={link.icon} />
+                  {link.label}
+                </Link>
+                {link.children && (
+                  <div className="ml-6 mt-0.5 flex flex-col gap-0.5">
+                    {link.children.map((child) => (
+                      <Link
+                        key={child.href}
+                        href={child.href}
+                        className={cn(
+                          "rounded-md px-2 py-1.5 text-xs text-stone-600 hover:bg-stone-100",
+                          pathname.startsWith(child.href) &&
+                            "bg-emerald-50 font-medium text-emerald-900",
+                        )}
+                      >
+                        {child.label}
+                      </Link>
+                    ))}
+                  </div>
                 )}
-              >
-                <NavIcon kind={link.icon} />
-                {link.label}
-              </Link>
+              </div>
             );
           })}
           <Link

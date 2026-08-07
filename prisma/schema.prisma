@@ -37,6 +37,8 @@ model Site {
   dispatches DispatchOrder[]
   challans   Challan[]
   invoices   Invoice[]
+  qcGateConfigs       QcGateConfig[]
+  categoryRuleConfigs CategoryRuleConfig[]
 }
 
 // ===== USERS + RBAC =====
@@ -54,6 +56,7 @@ enum UserRole {
   BANK_LAB_HEAD
   BANK_WITNESS
   BANK_CRYOBANK_TECH
+  BANK_QC_OFFICER
   BANK_MATCHING_OPS
   BANK_CLINICAL_REVIEWER
   BANK_FINANCE
@@ -240,6 +243,7 @@ model LabTest {
 
 // ===== SAMPLE + VIAL (Andrology) =====
 
+/// Grade tier (A/B/C) — QC-A5 post-thaw metrics. Alias: GradeTier.
 enum SampleGrade {
   A
   B
@@ -247,77 +251,98 @@ enum SampleGrade {
   REJECTED
 }
 
+/// Category tier — composite rule. Alias: CategoryTier. Prefixes PRM/STD/ECN.
 enum SampleCategory {
   PREMIUM
   STANDARD
   ECONOMY
 }
 
+/// Release-timing flag (orthogonal to Priority). Default QUARANTINE per ICMR donor semen.
+enum SampleReleaseTiming {
+  REGULAR
+  QUARANTINE
+}
+
+/// 12-state andrology pipeline (A0–A10).
 enum SampleState {
   DRAFT
   ACCESSIONED
   ANALYZED
-  PREP_DONE
-  VIAL_CREATED
-  CRYO_DONE
-  QC_A5_PASS
-  QC_A5_FAIL
-  IN_QUARANTINE
-  QUARANTINE_CLEARED
-  IN_INVENTORY
-  DISCARDED
+  ADVANCED_TESTING
+  DECIDED
+  PREPARED
+  VIALED
+  CRYOPRESERVED
+  QC_A5_PENDING
+  QUARANTINE
+  POST_THAW_ANALYZED
+  CLOSED
 }
 
 model Sample {
-  id        String @id @default(cuid())
+  id         String @id @default(cuid())
   sampleCode String @unique
-  donorId   String
-  donor     Donor  @relation("SampleDonor", fields: [donorId], references: [id])
-  siteId    String
-  site      Site   @relation(fields: [siteId], references: [id])
+  donorId    String
+  donor      Donor  @relation("SampleDonor", fields: [donorId], references: [id])
+  siteId     String
+  site       Site   @relation(fields: [siteId], references: [id])
 
-  sampleType SampleType     @default(QUARANTINE)
-  priority   SamplePriority @default(REGULAR)
+  sampleType    SampleType           @default(QUARANTINE)
+  priority      SamplePriority       @default(REGULAR)
+  releaseTiming SampleReleaseTiming  @default(QUARANTINE)
 
   collectionDate     DateTime
   collectionTime     String
   abstinenceDays     Int
   collectionMethod   String  @default("MASTURBATION")
   collectionLocation String?
+  deliveredToLabAt   DateTime?
   notes              String?
 
+  // QC-A1 accession checks
+  qcA1ContainerIntact   Boolean?
+  qcA1IdMatch           Boolean?
+  qcA1TimeUnder30       Boolean?
+  qcA1CompleteEjaculate Boolean?
+
+  // Macro (WHO 6th) — also exposed as macroVolume / macroPh in UI
   appearance          String?
   liquefactionTimeMin Int?
   viscosity           String?
-  volumeML            Float?
-  ph                  Float?
+  volumeML            Float? // macroVolume
+  ph                  Float? // macroPh
   colour              String?
   semenFructose       Float?
   odour               String?
 
-  concentrationMPerML             Float?
-  totalSpermsMillion              Float?
-  progressiveMotilityPct          Float?
-  nonProgressiveMotilityPct       Float?
-  totalMotilityPct                Float?
-  immotilePct                     Float?
-  rapidPRPct                      Float?
-  slowPRPct                       Float?
-  totalMotileSpermsMillion        Float?
-  totalRapidMotileSpermsMillion   Float?
-  morphologyNormalPct             Float?
-  vitalityPct                     Float?
-  roundCellsPerML                 Int?
-  agglutinationGrade              String?
-  aggregationGrade                String?
-  rbcPresent                      Boolean?
+  // Micro (WHO 6th)
+  concentrationMPerML           Float? // microConcentration
+  totalSpermsMillion            Float?
+  progressiveMotilityPct        Float? // microMotilityPR
+  nonProgressiveMotilityPct     Float?
+  totalMotilityPct              Float? // microMotilityTotal
+  immotilePct                   Float?
+  rapidPRPct                    Float?
+  slowPRPct                     Float?
+  totalMotileSpermsMillion      Float?
+  totalRapidMotileSpermsMillion Float?
+  morphologyNormalPct           Float? // microMorphology
+  vitalityPct                   Float? // microVitality
+  roundCellsPerML               Int?
+  agglutinationGrade            String?
+  aggregationGrade              String?
+  rbcPresent                    Boolean?
 
-  dfiPct             Float?
-  marTestPct         Float?
-  dsDnaBreakPct      Float?
-  semenCultureResult String?
+  // Advanced tests
+  dfiPct             Float? // dfi
+  marTestPct         Float? // mar
+  dsDnaBreakPct      Float? // dsDna
+  semenCultureResult String? // semenCulture
 
-  prepMethod          String?
+  // Preparation / decision
+  decisionOutcome     String? // DISCARD | RESCHEDULE | PROCEED
+  prepMethod          String? // preparationMethod
   preppedAt           DateTime?
   postPrepMotilityPct Float?
 
@@ -328,14 +353,25 @@ model Sample {
   grade    SampleGrade?
   category SampleCategory?
 
-  analysisVideoUrl String?
+  analysisVideoUrl String? // videoAssetUrl
   postThawVideoUrl String?
   qrPackUrl        String?
+  testVialThawResult Float? // post-thaw PR % from QC-A5 test vial
+
+  // Post-thaw 9-param (A9) — may reuse micro fields; dedicated snapshot:
+  postThawConcentration Float?
+  postThawRapidPRPct    Float?
+  postThawSlowPRPct     Float?
+  postThawNonProgPct    Float?
+  postThawVitalityPct   Float?
+  postThawMorphologyPct Float?
+  postThawVolumeML      Float?
 
   state                      SampleState @default(DRAFT)
   quarantineStartDate        DateTime?
   quarantineEndDate          DateTime?
   postQuarantineSerologyPass Boolean?
+  day165NotifiedAt           DateTime?
 
   vials     Vial[]
   auditLogs AuditLog[] @relation("AuditLogSample")
@@ -346,21 +382,27 @@ model Sample {
   @@index([state])
   @@index([donorId])
   @@index([sampleType, priority])
+  @@index([releaseTiming, priority])
 }
 
 model Vial {
-  id        String @id @default(cuid())
-  vialCode  String @unique
-  sampleId  String
-  sample    Sample @relation(fields: [sampleId], references: [id])
+  id       String @id @default(cuid())
+  vialCode String @unique
+  sampleId String
+  sample   Sample @relation(fields: [sampleId], references: [id])
 
   volumeML Float @default(0.5)
 
+  // Location (currentTankId / canister / rack / position)
   tankId       String
   tank         CryoTank @relation(fields: [tankId], references: [id])
   canisterCode String
   rackCode     String
   positionCode String?
+
+  category      SampleCategory?
+  grade         SampleGrade?
+  isQuarantined Boolean @default(false)
 
   isReleased            Boolean   @default(false)
   releasedAt            DateTime?
@@ -376,6 +418,7 @@ model Vial {
   @@index([sampleId])
   @@index([tankId])
   @@index([isReleased, isDispensed])
+  @@index([isQuarantined])
 }
 
 model CryoTank {
@@ -390,6 +433,32 @@ model CryoTank {
 
   vials     Vial[]
   createdAt DateTime @default(now())
+}
+
+/// Per-site QC gate toggles + threshold overrides (QC-A6 is statutory — keep enabled).
+model QcGateConfig {
+  id                  String  @id @default(cuid())
+  siteId              String
+  site                Site    @relation(fields: [siteId], references: [id])
+  gateName            String // QC_A1 … QC_A6, POST_THAW_CONC, POST_THAW_RAPID_PR, …
+  isEnabled           Boolean @default(true)
+  thresholdOverrides  Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([siteId, gateName])
+  @@index([siteId])
+}
+
+/// Per-site category composite rules + default tank mapping.
+model CategoryRuleConfig {
+  id              String   @id @default(cuid())
+  siteId          String   @unique
+  site            Site     @relation(fields: [siteId], references: [id])
+  rulesJson       Json // { premium: {...}, standard: {...}, economy: {...} }
+  tankMappingJson Json // { PREMIUM: tankId, STANDARD: tankId, ECONOMY: tankId, QUARANTINE: tankId }
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 // ===== CLINIC + CONTRACT =====
