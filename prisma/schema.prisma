@@ -64,6 +64,7 @@ enum UserRole {
   BANK_SITE_HEAD
   BANK_COMPLIANCE
   BANK_DISPATCH_COORD
+  BANK_LOGISTICS
   BANK_SITE_ADMIN
   BANK_SUPER_ADMIN
   L2_IVF_CLINICIAN
@@ -561,57 +562,71 @@ model Recipient {
 
 // ===== DRF (Donor Requisition Form) =====
 
+/// 10-state DRF lifecycle (pull mechanism → outcome close).
 enum DrfState {
   DRAFT
   SUBMITTED
   ACCEPTED
-  REJECTED
-  MATCHING
-  MATCH_READY
-  AWAITING_RECIPIENT_SELECTION
   ALLOCATED
-  DISPATCHED
+  IN_TRANSIT
+  DELIVERED
   IN_CYCLE
-  CLOSED_OUTCOME
-  CLOSED_NO_OUTCOME
+  OUTCOME_PENDING
+  CLOSED
   CANCELLED
 }
 
 model DRF {
-  id          String @id @default(cuid())
-  drfNumber   String @unique
-  siteId      String
-  site        Site   @relation(fields: [siteId], references: [id])
-  clinicId    String
-  clinic      Clinic @relation(fields: [clinicId], references: [id])
-  recipientId String
-  recipient   Recipient @relation(fields: [recipientId], references: [id])
+  id        String @id @default(cuid())
+  drfNumber String @unique // LIF-{ClinicCode}-DRF-YYMMDD-NNNN · alias: drfCode
+  /// Target fulfillment site (GSTIN / inventory)
+  siteId    String
+  site      Site   @relation(fields: [siteId], references: [id])
+  /// Requesting clinic
+  clinicId  String
+  clinic    Clinic @relation(fields: [clinicId], references: [id])
+  recipientId String?
+  recipient   Recipient? @relation(fields: [recipientId], references: [id])
 
-  donorType           DonorType
-  packageTier         PackageTier
-  selectionMode       SelectionMode
-  engineSubs          String[]
-  clinicalIndication  String?
+  /// Dispatch commodity type (6 types)
+  type     DispatchType   @default(SEMEN_VIAL)
+  priority SamplePriority @default(REGULAR)
+
+  donorType          DonorType     @default(SEMEN)
+  packageTier        PackageTier   @default(BASIC)
+  selectionMode      SelectionMode @default(ANONYMOUS)
+  engineSubs         String[]
+  clinicalIndication String?
+  notes              String?
+
+  requestedQuantity Int               @default(1)
+  filterCategory    SampleCategory?
+  filterGrade       SampleGrade?
 
   doctorUserId          String?
   doctorArtActRegNumber String?
   doctorSignedAt        DateTime?
 
-  financialModelApplied FinancialModel
+  financialModelApplied FinancialModel @default(B)
 
-  state          DrfState  @default(DRAFT)
+  state          DrfState @default(DRAFT)
   submittedAt    DateTime?
   acceptedAt     DateTime?
   rejectedReason String?
 
-  allocatedDonorId           String?
-  allocatedAt                DateTime?
-  bidirectionalTagWrittenAt  DateTime?
+  allocatedDonorId          String?
+  assignedVialIds           Json? // string[] of Vial IDs
+  allocatedAt               DateTime?
+  bidirectionalTagWrittenAt DateTime?
+  dispatchedAt              DateTime?
+  deliveredAt               DateTime?
+  expectedDeliveryAt        DateTime?
 
   outcomeType       String?
   outcomeReportedAt DateTime?
 
   dispatches DispatchOrder[]
+  challans   Challan[]
   cohort     EmbryoCohort?
   invoices   Invoice[]
 
@@ -620,38 +635,37 @@ model DRF {
 
   @@index([state])
   @@index([clinicId])
+  @@index([type, priority])
 }
 
 // ===== DISPATCH =====
 
 enum DispatchType {
-  SEMEN_TAGGED
-  SEMEN_UNTAGGED
-  SEMEN_RETURN
-  OOCYTE_DONOR_UNSTIM
-  OOCYTE_DONOR_STIM
-  OOCYTE_DONOR_RETURN
+  SEMEN_VIAL
+  OOCYTE_FRESH
+  OOCYTE_VITRIFIED
+  EMBRYO_FRESH
+  EMBRYO_VITRIFIED
+  ANCILLARY_SUPPLIES
 }
 
-enum DispatchState {
+/// DispatchOrder states mirror the DRF 10-state machine.
+enum DispatchOrderState {
   DRAFT
-  BOOKED
-  PICKED
-  PACKED
+  SUBMITTED
+  ACCEPTED
+  ALLOCATED
   IN_TRANSIT
   DELIVERED
-  RECEIVED
-  TAGGED
-  USED
+  IN_CYCLE
+  OUTCOME_PENDING
   CLOSED
   CANCELLED
-  EXCEPTION
-  RETURNING
 }
 
 model DispatchOrder {
   id             String @id @default(cuid())
-  dispatchNumber String @unique
+  dispatchNumber String @unique // LIF-{Site}-DSP-YYMMDD-NNNN · alias: dispatchCode
   siteId         String
   site           Site   @relation(fields: [siteId], references: [id])
   drfId          String?
@@ -659,8 +673,9 @@ model DispatchOrder {
   clinicId       String
   clinic         Clinic @relation(fields: [clinicId], references: [id])
 
-  type  DispatchType
-  state DispatchState @default(DRAFT)
+  type     DispatchType
+  state    DispatchOrderState @default(DRAFT)
+  priority SamplePriority     @default(REGULAR)
 
   vialIds String[]
   donorId String?
@@ -669,12 +684,14 @@ model DispatchOrder {
   courierTrackingId String?
   temperatureLogUrl String?
   podUrl            String?
+  chainOfCustodyLog Json? // [{at, actorUserId, action, note}]
 
   travelMode       String?
   travelBookingRef String?
   accommodationRef String?
   escortUserId     String?
 
+  scheduledAt  DateTime?
   packedAt     DateTime?
   dispatchedAt DateTime?
   deliveredAt  DateTime?
@@ -688,6 +705,7 @@ model DispatchOrder {
 
   @@index([state])
   @@index([drfId])
+  @@index([clinicId])
 }
 
 // ===== BILLING (Challan → Invoice → Payment) =====
@@ -704,21 +722,21 @@ model SKU {
   isActive     Boolean @default(true)
 }
 
-enum DocumentState {
-  DRAFT
-  ISSUED
-  CANCELLED
+enum ChallanStatus {
+  RAISED
+  ACKNOWLEDGED
   CONVERTED_TO_INVOICE
+  CANCELLED
 }
 
-enum InvoiceState {
+enum InvoiceStatus {
   DRAFT
-  ISSUED
-  PARTIALLY_PAID
-  PAID
+  RAISED
+  PAID_FULL
+  PAID_PARTIAL
   OVERDUE
-  WRITTEN_OFF
-  CANCELLED
+  CREDITED
+  VOID
 }
 
 enum PaymentMode {
@@ -739,24 +757,29 @@ model Challan {
   challanNumber String @unique
   siteId        String
   site          Site   @relation(fields: [siteId], references: [id])
-  dispatchId    String
-  dispatch      DispatchOrder @relation(fields: [dispatchId], references: [id])
+  dispatchId    String?
+  dispatch      DispatchOrder? @relation(fields: [dispatchId], references: [id])
+  drfId         String?
+  drf           DRF?           @relation(fields: [drfId], references: [id])
 
-  gstin    String
+  gstin     String
   buyerType String
-  buyerId  String
+  buyerId   String
 
   totalValue   Decimal @db.Decimal(19, 4)
   taxableValue Decimal @db.Decimal(19, 4)
   totalGst     Decimal @db.Decimal(19, 4)
   totalWithGst Decimal @db.Decimal(19, 4)
 
-  state                DocumentState @default(ISSUED)
+  status               ChallanStatus @default(RAISED)
   issuedAt             DateTime      @default(now())
   convertedToInvoiceAt DateTime?
 
   invoice   Invoice?          @relation("ChallanInvoice")
   lineItems ChallanLineItem[]
+
+  @@index([status])
+  @@index([drfId])
 }
 
 model ChallanLineItem {
@@ -808,15 +831,15 @@ model Invoice {
   irn       String?
   qrCodeUrl String?
 
-  state    InvoiceState @default(ISSUED)
-  issuedAt DateTime     @default(now())
+  status   InvoiceStatus @default(RAISED)
+  issuedAt DateTime      @default(now())
   paidAt   DateTime?
 
   lineItems   InvoiceLineItem[]
   payments    Payment[]
   creditNotes CreditNote[]
 
-  @@index([state])
+  @@index([status])
   @@index([dueDate])
 }
 

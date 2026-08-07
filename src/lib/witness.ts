@@ -10,6 +10,8 @@ const WITNESS_ROLES: UserRole[] = [
   UserRole.BANK_CRYOBANK_TECH,
   UserRole.BANK_ANDROLOGY_TECH,
   UserRole.BANK_QC_OFFICER,
+  UserRole.BANK_DISPATCH_COORD,
+  UserRole.BANK_LOGISTICS,
   UserRole.BANK_SUPER_ADMIN,
 ];
 
@@ -46,7 +48,10 @@ export async function verifyWitnesses(
 
 export async function logAttestation(input: {
   action: string;
-  sampleId: string;
+  /** @deprecated prefer entityId + entityType */
+  sampleId?: string;
+  entityId?: string;
+  entityType?: string;
   primaryUserId: string;
   witnessUserId: string;
 }): Promise<void> {
@@ -56,12 +61,16 @@ export async function logAttestation(input: {
     input.action,
   );
 
+  const entityType = input.entityType ?? "Sample";
+  const entityId = input.entityId ?? input.sampleId;
+  if (!entityId) throw new Error("entityId required for attestation");
+
   await audit.log({
     actorUserId: input.primaryUserId,
     action: "WITNESS_ATTEST",
-    entityType: "Sample",
-    entityId: input.sampleId,
-    sampleRelId: input.sampleId,
+    entityType,
+    entityId,
+    sampleRelId: entityType === "Sample" ? entityId : null,
     afterJson: {
       action: input.action,
       primaryUserId: input.primaryUserId,

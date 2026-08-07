@@ -3,11 +3,15 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  ClipboardList,
+  FileText,
   FlaskConical,
   LayoutDashboard,
   LogOut,
+  Receipt,
   Settings2,
   Snowflake,
+  Truck,
   Users,
   UserRound,
 } from "lucide-react";
@@ -24,7 +28,11 @@ type NavIconKind =
   | "donors"
   | "samples"
   | "cryo"
-  | "config";
+  | "config"
+  | "drfs"
+  | "dispatches"
+  | "challans"
+  | "invoices";
 
 type NavItem = {
   href: string;
@@ -40,6 +48,10 @@ const NAV: Record<PortalKind, NavItem[]> = {
     { href: "/admin/donors", label: "Donors", icon: "donors" },
     { href: "/admin/samples", label: "Samples", icon: "samples" },
     { href: "/admin/cryobank", label: "Cryobank", icon: "cryo" },
+    { href: "/admin/drfs", label: "DRFs", icon: "drfs" },
+    { href: "/admin/dispatches", label: "Dispatches", icon: "dispatches" },
+    { href: "/admin/challans", label: "Challans", icon: "challans" },
+    { href: "/admin/invoices", label: "Invoices", icon: "invoices" },
     {
       href: "/admin/config",
       label: "Config",
@@ -50,7 +62,10 @@ const NAV: Record<PortalKind, NavItem[]> = {
       ],
     },
   ],
-  clinic: [{ href: "/clinic", label: "Dashboard", icon: "dash" }],
+  clinic: [
+    { href: "/clinic", label: "Dashboard", icon: "dash" },
+    { href: "/clinic/drfs", label: "DRFs", icon: "drfs" },
+  ],
   donor: [{ href: "/donor", label: "Dashboard", icon: "dash" }],
   recipient: [{ href: "/recipient", label: "Dashboard", icon: "dash" }],
 };
@@ -62,6 +77,10 @@ function NavIcon({ kind }: { kind?: NavIconKind }) {
   if (kind === "samples") return <FlaskConical className={className} />;
   if (kind === "cryo") return <Snowflake className={className} />;
   if (kind === "config") return <Settings2 className={className} />;
+  if (kind === "drfs") return <ClipboardList className={className} />;
+  if (kind === "dispatches") return <Truck className={className} />;
+  if (kind === "challans") return <FileText className={className} />;
+  if (kind === "invoices") return <Receipt className={className} />;
   return <LayoutDashboard className={className} />;
 }
 

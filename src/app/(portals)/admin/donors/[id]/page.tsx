@@ -380,7 +380,7 @@ function DrfSummary({
     drfNumber: string;
     state: string;
     clinic: { name: string };
-    recipient: { fullName: string };
+    recipient: { fullName: string } | null;
     allocatedAt: Date | null;
   }>;
 }) {
@@ -408,7 +408,7 @@ function DrfSummary({
                 <TableCell>{d.drfNumber}</TableCell>
                 <TableCell>{d.state}</TableCell>
                 <TableCell>{d.clinic.name}</TableCell>
-                <TableCell>{d.recipient.fullName}</TableCell>
+                <TableCell>{d.recipient?.fullName ?? "—"}</TableCell>
                 <TableCell>
                   {d.allocatedAt?.toISOString() ?? "—"}
                 </TableCell>
