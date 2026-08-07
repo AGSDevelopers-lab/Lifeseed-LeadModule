@@ -9,7 +9,8 @@ export type AuditAction =
   | "STATE_TRANSITION"
   | "APPROVE"
   | "READ_SENSITIVE"
-  | "WITNESS_ATTEST";
+  | "WITNESS_ATTEST"
+  | "role.assigned";
 
 export type AuditRecordInput = {
   actorUserId?: string | null;
@@ -85,6 +86,17 @@ export async function recordAudit(
   });
 }
 
+/**
+ * Convenience API: audit.log({ action: "role.assigned", ... })
+ * Uses the audited Prisma singleton from db.ts.
+ */
+export const audit = {
+  async log(input: AuditRecordInput): Promise<void> {
+    const { prisma } = await import("@/lib/db");
+    await recordAudit(prisma as unknown as PrismaClient, input);
+  },
+};
+
 type QueryArgs = {
   model: string;
   operation: string;
@@ -95,9 +107,6 @@ type QueryArgs = {
 /**
  * Prisma Client Extension that logs CREATE / UPDATE / DELETE writes
  * into AuditLog with a per-chain SHA-256 hash.
- *
- * Actor / IP / UA injection will come from AsyncLocalStorage once auth exists.
- * Skeleton only — no business-rule side effects.
  */
 export function createAuditedPrismaClient(base: PrismaClient) {
   return base.$extends({
@@ -122,8 +131,6 @@ export function createAuditedPrismaClient(base: PrismaClient) {
               afterJson: toJsonSafe(result),
             });
           } catch (err) {
-            // Never fail the primary write because audit logging failed.
-            // Surface via structured logger in a later pass.
             console.error("[audit] failed to record write", {
               model,
               operation,

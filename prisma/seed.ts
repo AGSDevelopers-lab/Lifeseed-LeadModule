@@ -17,6 +17,7 @@ import {
   SiteCode,
   UserRole,
 } from "@prisma/client";
+import { faker } from "@faker-js/faker";
 
 import {
   bmiFrom,
@@ -623,7 +624,6 @@ async function main() {
       weight: 72,
       maritalStatus: "MARRIED",
       hasLivingChild: true,
-      age: 32,
     },
     {
       donorCode: "D-WB-00002",
@@ -642,7 +642,6 @@ async function main() {
       weight: 76,
       maritalStatus: "UNMARRIED",
       hasLivingChild: false,
-      age: 28,
     },
     {
       donorCode: "D-TG-00001",
@@ -661,7 +660,6 @@ async function main() {
       weight: 68,
       maritalStatus: "MARRIED",
       hasLivingChild: true,
-      age: 30,
     },
     {
       donorCode: "D-WB-00003",
@@ -680,7 +678,6 @@ async function main() {
       weight: 58,
       maritalStatus: "MARRIED",
       hasLivingChild: true, // ART Act — required TRUE for oocyte donors
-      age: 27,
     },
     {
       donorCode: "D-TG-00002",
@@ -699,19 +696,23 @@ async function main() {
       weight: 55,
       maritalStatus: "MARRIED",
       hasLivingChild: true,
-      age: 29,
       rejectionCode: null as string | null,
     },
   ];
 
   for (const d of donors) {
+    const dob = faker.date.between({
+      from: "1990-01-01",
+      to: "2000-12-31",
+    });
+
     await prisma.donor.upsert({
       where: { donorCode: d.donorCode },
       update: {
         type: d.type,
         siteId: d.siteId,
         fullName: d.fullName,
-        dob: dobYearsAgo(d.age),
+        dob,
         gender: d.gender,
         aadhaarHash: hashSeedAadhaar(d.donorCode),
         panMasked: maskPan(d.donorCode),
@@ -737,7 +738,7 @@ async function main() {
         type: d.type,
         siteId: d.siteId,
         fullName: d.fullName,
-        dob: dobYearsAgo(d.age),
+        dob,
         gender: d.gender,
         aadhaarHash: hashSeedAadhaar(d.donorCode),
         panMasked: maskPan(d.donorCode),
