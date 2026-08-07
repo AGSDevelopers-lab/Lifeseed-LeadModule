@@ -112,12 +112,37 @@ enum DonorType {
 
 enum DonorStatus {
   PROSPECT
+  ELIGIBLE
   ACTIVE
   DEFERRED
   REJECTED
   WITHDRAWN
   RETIRED
   SUSPENDED
+}
+
+/// Bank Admin journey phases (P0–P4) for donor pathway UI + guards.
+enum DonorPhase {
+  P0_INTAKE
+  P1_SCREENING
+  P2_ACTIVE
+  P3_DRF
+  P4_OUTCOME
+}
+
+/// Canonical rejection / deferral reason codes (common trunk + serology).
+enum RejectionCode {
+  REG_AGE
+  REG_MAR
+  REG_CHILD
+  OPS_KYC
+  OPS_DUP
+  OPS_GEO
+  WDR_VOL
+  MED_INF
+  MED_PHY
+  GEN_HX
+  SEROLOGY_POSITIVE
 }
 
 enum SampleType {
@@ -154,12 +179,15 @@ model Donor {
   marriageCertUrl String?
   childCertUrl    String?
 
-  status                 DonorStatus @default(PROSPECT)
-  rejectionCode          String?
+  status                 DonorStatus    @default(PROSPECT)
+  phase                  DonorPhase     @default(P0_INTAKE)
+  rejectionCode          RejectionCode?
   passportIssuedAt       DateTime?
   registryEntryId        String?
-  cumulativePregnancies  Int         @default(0)
+  cumulativePregnancies  Int            @default(0)
   bankPolicyCap          Int?
+  deferredUntil          DateTime?
+  outcomeNotes           String?
 
   bloodGroup String?
   rhFactor   String?
@@ -178,6 +206,7 @@ model Donor {
 
   @@index([status])
   @@index([type])
+  @@index([phase])
 }
 
 model DonorConsent {
