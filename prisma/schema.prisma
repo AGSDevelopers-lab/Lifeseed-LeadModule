@@ -60,6 +60,7 @@ enum UserRole {
   BANK_MATCHING_OPS
   BANK_CLINICAL_REVIEWER
   BANK_FINANCE
+  BANK_ACCOUNTS_MANAGER
   BANK_CFO
   BANK_SITE_HEAD
   BANK_COMPLIANCE
@@ -752,6 +753,34 @@ enum PaymentMode {
   CHEQUE
 }
 
+enum PaymentMethod {
+  RAZORPAY
+  PAYU
+  BANK_TRANSFER
+  CHEQUE
+  CASH
+  CREDIT_NOTE
+  ADJUSTMENT
+}
+
+enum PaymentGatewayStatus {
+  INITIATED
+  PROCESSING
+  CAPTURED
+  FAILED
+  REFUNDED
+  PARTIAL_REFUND
+}
+
+enum DunningStage {
+  NONE
+  REMINDER_1
+  REMINDER_2
+  FINAL_NOTICE
+  ESCALATED
+  WRITE_OFF
+}
+
 model Challan {
   id            String @id @default(cuid())
   challanNumber String @unique
@@ -812,6 +841,9 @@ model Invoice {
   dispatchId String?
   dispatch   DispatchOrder? @relation(fields: [dispatchId], references: [id])
 
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+
   gstin                    String
   buyerType                String
   buyerId                  String
@@ -831,6 +863,10 @@ model Invoice {
   irn       String?
   qrCodeUrl String?
 
+  gatewayOrderId   String?
+  gatewayPaymentId String?
+  dunningStage     DunningStage @default(NONE)
+
   status   InvoiceStatus @default(RAISED)
   issuedAt DateTime      @default(now())
   paidAt   DateTime?
@@ -841,6 +877,9 @@ model Invoice {
 
   @@index([status])
   @@index([dueDate])
+  @@index([dunningStage])
+  @@index([subscriptionId])
+  @@index([gatewayPaymentId])
 }
 
 model InvoiceLineItem {
@@ -866,13 +905,21 @@ model Payment {
   invoiceId           String
   invoice             Invoice     @relation(fields: [invoiceId], references: [id])
   amount              Decimal     @db.Decimal(19, 4)
-  mode                PaymentMode
+  method              PaymentMethod @default(BANK_TRANSFER)
+  mode                PaymentMode?
   gateway             String?
-  gatewayTxnId        String?
+  gatewayTxnId        String?     @unique
+  gatewayStatus       PaymentGatewayStatus?
+  referenceNumber     String?
+  notes               String?
   paidAt              DateTime
   reconciledAt        DateTime?
   reconciliationLevel String?
   bankRef             String?
+
+  @@index([invoiceId])
+  @@index([method])
+  @@index([paidAt])
 }
 
 model CreditNote {
@@ -889,20 +936,39 @@ model CreditNote {
   refundCompletedAt DateTime?
 }
 
+model PaymentGatewayLog {
+  id               String   @id @default(cuid())
+  gateway          String // RAZORPAY | PAYU
+  eventType        String
+  gatewayPaymentId String?
+  gatewayOrderId   String?
+  invoiceId        String?
+  payload          Json
+  signatureValid   Boolean?
+  processed        Boolean  @default(false)
+  errorMessage     String?
+  receivedAt       DateTime @default(now())
+
+  @@index([gateway, gatewayPaymentId])
+  @@index([invoiceId])
+  @@index([receivedAt])
+}
+
 // ===== SUBSCRIPTIONS =====
 
 enum SubscriptionType {
-  STORAGE_SEMEN
-  STORAGE_EMBRYO
-  STORAGE_OOCYTE
-  ENGINE_PREMIUM
-  CLINIC_MEMBERSHIP
+  STORAGE_ANNUAL
+  STORAGE_MONTHLY
+  MEMBERSHIP_BASIC
+  MEMBERSHIP_PREMIUM
 }
 
-enum SubscriptionState {
+enum SubscriptionStatus {
   ACTIVE
   PAUSED
   CANCELLED
+  EXPIRED
+  DUNNING
 }
 
 enum BillingFrequency {
@@ -912,20 +978,35 @@ enum BillingFrequency {
 }
 
 model Subscription {
-  id               String            @id @default(cuid())
-  type             SubscriptionType
-  frequency        BillingFrequency
-  skuCode          String
-  subscriberType   String
-  subscriberId     String
-  state            SubscriptionState @default(ACTIVE)
-  startedAt        DateTime          @default(now())
-  nextBillDate     DateTime
-  endedAt          DateTime?
-  autoPayEnabled   Boolean           @default(false)
-  autoPayMandateId String?
-  quantity         Int               @default(1)
-  unitAmount       Decimal           @db.Decimal(19, 4)
+  id                 String             @id @default(cuid())
+  subscriptionNumber String             @unique
+  type               SubscriptionType
+  frequency          BillingFrequency
+  skuCode            String
+  subscriberType     String // CLINIC | RECIPIENT
+  subscriberId       String
+  status             SubscriptionStatus @default(ACTIVE)
+  startedAt          DateTime           @default(now())
+  nextBillingAt      DateTime
+  endedAt            DateTime?
+  autoPayEnabled     Boolean            @default(false)
+  autoPayMandateId   String?
+  quantity           Int                @default(1)
+  unitAmount         Decimal            @db.Decimal(19, 4)
+  gstAmount          Decimal            @default(0) @db.Decimal(19, 4)
+  totalAmount        Decimal            @db.Decimal(19, 4)
+  siteId             String?
+  notes              String?
+
+  invoices Invoice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([type])
+  @@index([subscriberType, subscriberId])
+  @@index([nextBillingAt])
 }
 
 // ===== EMBRYOLOGY =====

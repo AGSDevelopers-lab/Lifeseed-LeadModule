@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { InvoiceStatus } from "@prisma/client";
+import { DunningStage, InvoiceStatus } from "@prisma/client";
 
+import { RunDunningButton } from "./run-dunning-button";
 import { Button } from "@/components/ui/primitives";
 import {
   Table,
@@ -38,14 +39,15 @@ export default async function InvoicesPage({
 }) {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (
-    !permissionGranted(permissionsForRoles(session.roles), "invoice.list")
-  ) {
-    redirect("/admin");
-  }
+  const perms = permissionsForRoles(session.roles);
+  if (!permissionGranted(perms, "invoice.list")) redirect("/admin");
 
   const sp = await searchParams;
   const status = one(sp.status) as InvoiceStatus | undefined;
+  const dunningStage = one(sp.dunning) as DunningStage | undefined;
+  const clinicId = one(sp.clinic);
+  const dueFrom = one(sp.dueFrom);
+  const dueTo = one(sp.dueTo);
   const from = one(sp.from);
   const to = one(sp.to);
 
@@ -53,6 +55,16 @@ export default async function InvoicesPage({
   const rows = await prisma.invoice.findMany({
     where: {
       ...(status ? { status } : {}),
+      ...(dunningStage ? { dunningStage } : {}),
+      ...(clinicId ? { buyerId: clinicId, buyerType: "CLINIC" } : {}),
+      ...(dueFrom || dueTo
+        ? {
+            dueDate: {
+              ...(dueFrom ? { gte: new Date(dueFrom) } : {}),
+              ...(dueTo ? { lte: new Date(`${dueTo}T23:59:59Z`) } : {}),
+            },
+          }
+        : {}),
       ...(from || to
         ? {
             issuedAt: {
@@ -67,17 +79,25 @@ export default async function InvoicesPage({
   });
 
   const clinics = await prisma.clinic.findMany({
-    where: { id: { in: [...new Set(rows.map((r) => r.buyerId))] } },
+    orderBy: { clinicCode: "asc" },
   });
   const clinicMap = new Map(clinics.map((c) => [c.id, c]));
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-stone-900">Invoices</h1>
-        <p className="text-sm text-stone-600">
-          Raised automatically from challan on DRF Delivered.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-stone-900">Invoices</h1>
+          <p className="text-sm text-stone-600">
+            Tax invoices · dunning · multi-GSTIN (WB 19 / TG 36).
+          </p>
+        </div>
+        <div className="flex gap-2">
+          {permissionGranted(perms, "invoice.dunning") && <RunDunningButton />}
+          <Link href="/api/billing/zoho-export">
+            <Button variant="outline">Zoho CSV</Button>
+          </Link>
+        </div>
       </div>
 
       <form
@@ -100,20 +120,50 @@ export default async function InvoicesPage({
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs font-medium text-stone-600">
-          From
+          Dunning
+          <select
+            name="dunning"
+            defaultValue={dunningStage ?? ""}
+            className="h-10 rounded-md border border-stone-300 px-2 text-sm"
+          >
+            <option value="">All</option>
+            {Object.values(DunningStage).map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-medium text-stone-600">
+          Clinic
+          <select
+            name="clinic"
+            defaultValue={clinicId ?? ""}
+            className="h-10 rounded-md border border-stone-300 px-2 text-sm"
+          >
+            <option value="">All</option>
+            {clinics.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.clinicCode}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-medium text-stone-600">
+          Due from
           <input
             type="date"
-            name="from"
-            defaultValue={from ?? ""}
+            name="dueFrom"
+            defaultValue={dueFrom ?? ""}
             className="h-10 rounded-md border border-stone-300 px-2 text-sm"
           />
         </label>
         <label className="flex flex-col gap-1 text-xs font-medium text-stone-600">
-          To
+          Due to
           <input
             type="date"
-            name="to"
-            defaultValue={to ?? ""}
+            name="dueTo"
+            defaultValue={dueTo ?? ""}
             className="h-10 rounded-md border border-stone-300 px-2 text-sm"
           />
         </label>
@@ -136,28 +186,36 @@ export default async function InvoicesPage({
               <TableHead>Amount</TableHead>
               <TableHead>Due</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Dunning</TableHead>
               <TableHead>Paid</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-stone-500">
+                <TableCell colSpan={7} className="text-center text-stone-500">
                   No invoices.
                 </TableCell>
               </TableRow>
             )}
             {rows.map((r) => {
               const overdue =
-                (r.status === "RAISED" || r.status === "PAID_PARTIAL") &&
+                (r.status === "RAISED" ||
+                  r.status === "PAID_PARTIAL" ||
+                  r.status === "OVERDUE") &&
                 r.dueDate < now;
               return (
                 <TableRow
                   key={r.id}
                   className={cn(overdue && "bg-red-50/70")}
                 >
-                  <TableCell className="font-medium">
-                    {r.invoiceNumber}
+                  <TableCell>
+                    <Link
+                      href={`/admin/invoices/${r.id}`}
+                      className="font-medium text-emerald-900 hover:underline"
+                    >
+                      {r.invoiceNumber}
+                    </Link>
                   </TableCell>
                   <TableCell>
                     {clinicMap.get(r.buyerId)?.clinicCode ??
@@ -167,9 +225,8 @@ export default async function InvoicesPage({
                   <TableCell className="text-xs">
                     {r.dueDate.toISOString().slice(0, 10)}
                   </TableCell>
-                  <TableCell>
-                    {overdue ? "OVERDUE" : r.status}
-                  </TableCell>
+                  <TableCell>{overdue ? "OVERDUE" : r.status}</TableCell>
+                  <TableCell className="text-xs">{r.dunningStage}</TableCell>
                   <TableCell className="text-xs">
                     {r.paidAt?.toISOString().slice(0, 10) ?? "—"}
                   </TableCell>
