@@ -6,6 +6,7 @@ import {
 
 import { audit } from "@/lib/audit";
 import { convertChallanToInvoice, raiseChallan } from "@/lib/challan-invoice";
+import { ensureEmbryoCohort } from "@/lib/embryology/cohort";
 import { prisma } from "@/lib/db";
 
 export const DRF_STATE_LABEL: Record<DrfState, string> = {
@@ -27,8 +28,8 @@ const EDGES: Partial<Record<DrfState, DrfState[]>> = {
   ACCEPTED: [DrfState.ALLOCATED, DrfState.CANCELLED],
   ALLOCATED: [DrfState.IN_TRANSIT, DrfState.CANCELLED],
   IN_TRANSIT: [DrfState.DELIVERED, DrfState.CANCELLED],
-  DELIVERED: [DrfState.IN_CYCLE],
-  IN_CYCLE: [DrfState.OUTCOME_PENDING],
+  DELIVERED: [DrfState.IN_CYCLE, DrfState.OUTCOME_PENDING],
+  IN_CYCLE: [DrfState.OUTCOME_PENDING, DrfState.CLOSED],
   OUTCOME_PENDING: [DrfState.CLOSED],
   CLOSED: [],
   CANCELLED: [],
@@ -159,6 +160,14 @@ export async function advanceDrf(
       drfId,
       challanId: challan.id,
     });
+
+    // Embryology: empty cohort linked on Delivered (Bank tracking shell)
+    await ensureEmbryoCohort(drfId);
+  }
+
+  // Also ensure cohort when entering IN_CYCLE without prior Delivered path
+  if (targetState === DrfState.IN_CYCLE) {
+    await ensureEmbryoCohort(drfId);
   }
 
   return updated;

@@ -7,6 +7,8 @@ const PUBLIC_PREFIXES = [
   "/signup",
   "/auth/callback",
   "/api/health",
+  "/api/webhooks",
+  "/api/embryology/nudges",
 ];
 
 const PROTECTED_PREFIXES = [

@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  Activity,
   ClipboardList,
   CreditCard,
   FileText,
   FlaskConical,
   LayoutDashboard,
   LogOut,
+  Microscope,
   PieChart,
   Receipt,
   Repeat,
@@ -38,7 +40,10 @@ type NavIconKind =
   | "invoices"
   | "subscriptions"
   | "payments"
-  | "finance";
+  | "finance"
+  | "cycles"
+  | "cohorts"
+  | "outcomes";
 
 type NavItem = {
   href: string;
@@ -65,6 +70,7 @@ const NAV: Record<PortalKind, NavItem[]> = {
       label: "Finance",
       icon: "finance",
     },
+    { href: "/admin/outcomes", label: "Outcomes", icon: "outcomes" },
     {
       href: "/admin/config",
       label: "Config",
@@ -78,6 +84,8 @@ const NAV: Record<PortalKind, NavItem[]> = {
   clinic: [
     { href: "/clinic", label: "Dashboard", icon: "dash" },
     { href: "/clinic/drfs", label: "DRFs", icon: "drfs" },
+    { href: "/clinic/cycles", label: "Cycles", icon: "cycles" },
+    { href: "/clinic/cohorts", label: "Cohorts", icon: "cohorts" },
   ],
   donor: [{ href: "/donor", label: "Dashboard", icon: "dash" }],
   recipient: [{ href: "/recipient", label: "Dashboard", icon: "dash" }],
@@ -97,6 +105,9 @@ function NavIcon({ kind }: { kind?: NavIconKind }) {
   if (kind === "subscriptions") return <Repeat className={className} />;
   if (kind === "payments") return <CreditCard className={className} />;
   if (kind === "finance") return <PieChart className={className} />;
+  if (kind === "cycles") return <Activity className={className} />;
+  if (kind === "cohorts") return <Microscope className={className} />;
+  if (kind === "outcomes") return <Activity className={className} />;
   return <LayoutDashboard className={className} />;
 }
 

@@ -50,6 +50,8 @@ enum UserRole {
   CLINIC_COORDINATOR
   CLINIC_NURSE
   CLINIC_ADMIN
+  CLINIC_EMBRYOLOGIST
+  CLINIC_WITNESS
   BANK_DONOR_COORD
   BANK_ANDROLOGY_TECH
   BANK_SR_ANDROLOGIST
@@ -67,6 +69,7 @@ enum UserRole {
   BANK_DISPATCH_COORD
   BANK_LOGISTICS
   BANK_SITE_ADMIN
+  BANK_MEDICAL_DIRECTOR
   BANK_SUPER_ADMIN
   L2_IVF_CLINICIAN
   L2_EMBRYOLOGIST
@@ -500,6 +503,10 @@ model Clinic {
   recipients Recipient[]
   drfs       DRF[]
   dispatches DispatchOrder[]
+  cycleEvents CycleEvent[]
+
+  /// Vienna KPI thresholds + future-Bank location toggles (all OFF by default)
+  embryologyConfig Json?
 
   createdAt DateTime @default(now())
 }
@@ -630,6 +637,8 @@ model DRF {
   challans   Challan[]
   cohort     EmbryoCohort?
   invoices   Invoice[]
+  cycleEvents  CycleEvent[]
+  outcomeNudges OutcomeNudge[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1025,34 +1034,145 @@ enum EmbryoDisposition {
   DISCARDED_ARREST
 }
 
+enum CycleEventType {
+  STIM_MONITORING
+  OPU_COMPLETED
+  OOCYTES_RETRIEVED
+  FERTILIZATION
+  DAY1_CHECK
+  DAY3_GRADE
+  DAY5_GRADE
+  PGT_RESULT
+  TRANSFER
+  VITRIFICATION
+  BETA_HCG
+  CLINICAL_PREGNANCY
+  LIVE_BIRTH
+  CYCLE_CANCELLED
+}
+
+enum CycleOutcome {
+  PREGNANT
+  NOT_PREGNANT
+  CANCELLED
+  CLOSED_NO_OUTCOME
+}
+
+enum BetaHcgResult {
+  POSITIVE
+  NEGATIVE
+  INCONCLUSIVE
+}
+
+enum PgtResult {
+  EUPLOID
+  ANEUPLOID
+  MOSAIC
+  NO_RESULT
+}
+
+enum CycleLocation {
+  BANK
+  L1
+  L2
+}
+
+enum NudgeStatus {
+  PENDING
+  SENT
+  SKIPPED
+}
+
+/// Append-only clinical event log for L2 cycle tracking (Bank coordination role).
+model CycleEvent {
+  id          String         @id @default(cuid())
+  drfId       String
+  drf         DRF            @relation(fields: [drfId], references: [id])
+  eventType   CycleEventType
+  occurredAt  DateTime
+  payload     Json
+  actorUserId String?
+  clinicId    String
+  clinic      Clinic         @relation(fields: [clinicId], references: [id])
+  location    CycleLocation  @default(L2)
+  createdAt   DateTime       @default(now())
+
+  @@index([drfId, occurredAt])
+  @@index([clinicId])
+  @@index([eventType])
+}
+
+model OutcomeNudge {
+  id          String      @id @default(cuid())
+  drfId       String
+  drf         DRF         @relation(fields: [drfId], references: [id])
+  dayOffset   Int // 14 | 30 | 90 | 180
+  scheduledAt DateTime
+  sentAt      DateTime?
+  status      NudgeStatus @default(PENDING)
+  createdAt   DateTime    @default(now())
+
+  @@unique([drfId, dayOffset])
+  @@index([status, scheduledAt])
+}
+
 model EmbryoCohort {
-  id                    String    @id @default(cuid())
-  drfId                 String    @unique
-  drf                   DRF       @relation(fields: [drfId], references: [id])
+  id       String @id @default(cuid())
+  drfId    String @unique
+  drf      DRF    @relation(fields: [drfId], references: [id])
+  clinicId String
+
+  startedAt             DateTime  @default(now())
   opuAt                 DateTime?
+  oocytesRetrieved      Int?
+  /// Legacy alias kept in sync with oocytesRetrieved
   totalOocytesRetrieved Int?
-  mIICount              Int?
-  clinicId              String
-  embryos               Embryo[]
-  createdAt             DateTime  @default(now())
+  miiCount              Int? @map("mIICount")
+  miCount               Int?
+  gvCount               Int?
+  day1_2pnCount         Int?
+  day3CleavedCount      Int?
+  day5BlastCount        Int?
+  transferredCount      Int? @default(0)
+  vitrifiedCount        Int? @default(0)
+  discardedCount        Int? @default(0)
+
+  outcome           CycleOutcome?
+  outcomeReportedAt DateTime?
+  closedAt          DateTime?
+  currentPhase      String        @default("E0") // E0–E9
+
+  embryos   Embryo[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Embryo {
-  id               String            @id @default(cuid())
-  cohortId         String
-  cohort           EmbryoCohort      @relation(fields: [cohortId], references: [id])
+  id       String       @id @default(cuid())
+  cohortId String
+  cohort   EmbryoCohort @relation(fields: [cohortId], references: [id])
+
+  /// Oocyte / embryo reference code (OCT-YYMM-CCC-NN)
   oocyteId         String            @unique
-  maturity         OocyteMaturity?
-  day1TwoPN        Boolean?
+  oocyteRef        String?
+  oocyteMaturity   OocyteMaturity?   @map("maturity")
+  day1_2pn         Boolean?          @map("day1TwoPN")
   day3CellCount    Int?
   day3FragPct      Int?
   day3Grade        String?
   day5Gardner      String?
   pgtTriggered     Boolean           @default(false)
-  pgtResult        String?
+  pgtResult        PgtResult?
   disposition      EmbryoDisposition?
+  storageRef       String?
   vitrificationLoc String?
-  transferAt       DateTime?
+  transferredAt    DateTime?         @map("transferAt")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([cohortId])
+  @@index([disposition])
 }
 
 // ===== DONATION RECORD (Phase 4 MRD) =====
