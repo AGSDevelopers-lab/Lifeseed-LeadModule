@@ -1,3 +1,5 @@
+import "server-only";
+
 import {
   DonorPhase,
   DonorStatus,
@@ -9,6 +11,13 @@ import {
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 
+export {
+  DEFERRABLE_CODES,
+  ICMR_SEROLOGY_TESTS,
+  PHASE_LABEL,
+  REJECTION_CODE_LABEL,
+} from "@/lib/donor-phase-labels";
+
 export const PHASE_ORDER: DonorPhase[] = [
   DonorPhase.P0_INTAKE,
   DonorPhase.P1_SCREENING,
@@ -16,47 +25,6 @@ export const PHASE_ORDER: DonorPhase[] = [
   DonorPhase.P3_DRF,
   DonorPhase.P4_OUTCOME,
 ];
-
-export const PHASE_LABEL: Record<DonorPhase, string> = {
-  P0_INTAKE: "P0 · Intake",
-  P1_SCREENING: "P1 · Screening",
-  P2_ACTIVE: "P2 · Active",
-  P3_DRF: "P3 · DRF",
-  P4_OUTCOME: "P4 · Outcome",
-};
-
-export const REJECTION_CODE_LABEL: Record<RejectionCode, string> = {
-  REG_AGE: "Age outside statutory range",
-  REG_MAR: "Marital status requirement not met",
-  REG_CHILD: "Living child requirement not met (oocyte)",
-  OPS_KYC: "KYC / identity verification failed",
-  OPS_DUP: "Duplicate registration detected",
-  OPS_GEO: "Geographic / site eligibility failed",
-  WDR_VOL: "Voluntary withdrawal",
-  MED_INF: "Medical / infectious disease flag",
-  MED_PHY: "Physical examination unfit",
-  GEN_HX: "Genetic history concern",
-  SEROLOGY_POSITIVE: "Mandatory serology positive",
-};
-
-/** Codes that may be used for temporary deferral (not permanent rejection). */
-export const DEFERRABLE_CODES: RejectionCode[] = [
-  "REG_AGE",
-  "OPS_KYC",
-  "OPS_GEO",
-  "MED_INF",
-  "MED_PHY",
-  "GEN_HX",
-];
-
-export const ICMR_SEROLOGY_TESTS = [
-  { code: "HIV_I_II", label: "HIV I / II" },
-  { code: "HBSAG", label: "HBsAg" },
-  { code: "HCV", label: "HCV" },
-  { code: "VDRL", label: "VDRL" },
-  { code: "HTLV", label: "HTLV" },
-  { code: "CMV_IGM", label: "CMV IgM" },
-] as const;
 
 const TERMINAL_STATUSES: DonorStatus[] = [
   DonorStatus.REJECTED,
@@ -76,6 +44,7 @@ function phaseIndex(phase: DonorPhase): number {
 export function canAdvance(
   donor: Pick<Donor, "phase" | "status"> & {
     currentTier?: SeedScoreTier | null;
+    aadhaarHash?: string | null;
   },
   targetPhase: DonorPhase,
   opts?: { bypassSeedScoreGate?: boolean },
@@ -86,6 +55,7 @@ export function canAdvance(
 export function canAdvanceDetailed(
   donor: Pick<Donor, "phase" | "status"> & {
     currentTier?: SeedScoreTier | null;
+    aadhaarHash?: string | null;
   },
   targetPhase: DonorPhase,
   opts?: { bypassSeedScoreGate?: boolean },
@@ -116,6 +86,19 @@ export function canAdvanceDetailed(
     return {
       canAdvance: false,
       reason: `Illegal phase transition: ${donor.phase} → ${targetPhase}`,
+    };
+  }
+
+  // P0 → P1 requires Aadhaar (collected at screening with STAGE_2 consent)
+  if (
+    donor.phase === DonorPhase.P0_INTAKE &&
+    targetPhase === DonorPhase.P1_SCREENING &&
+    (!donor.aadhaarHash || donor.aadhaarHash.length !== 64)
+  ) {
+    return {
+      canAdvance: false,
+      reason:
+        "Aadhaar hash required before P1 Screening. Capture KYC at full intake (STAGE_2 consent) first.",
     };
   }
 

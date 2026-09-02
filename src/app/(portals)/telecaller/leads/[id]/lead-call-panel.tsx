@@ -18,12 +18,14 @@ export function LeadCallPanel({
   canConvert,
   sites,
   clinics,
+  coordinators = [],
 }: {
   leadId: string;
   personType: LeadPersonType;
   canConvert: boolean;
   sites: Array<{ id: string; code: string; name: string }>;
   clinics: Array<{ id: string; name: string; clinicCode: string }>;
+  coordinators?: Array<{ id: string; email: string }>;
 }) {
   const router = useRouter();
   const [disposition, setDisposition] = useState<CallDispositionType>(
@@ -33,11 +35,12 @@ export function LeadCallPanel({
   const [followupAt, setFollowupAt] = useState("");
   const [pending, setPending] = useState(false);
 
-  // Convert extras
+  // Convert extras (Aadhaar deferred to P1 screening — DPDP)
   const [dob, setDob] = useState("");
   const [gender, setGender] = useState<"M" | "F" | "O">("M");
   const [siteId, setSiteId] = useState(sites[0]?.id ?? "");
-  const [aadhaarHash, setAadhaarHash] = useState("");
+  const [preferredIntakeAt, setPreferredIntakeAt] = useState("");
+  const [coordinatorUserId, setCoordinatorUserId] = useState("");
   const [clinicId, setClinicId] = useState(clinics[0]?.id ?? "");
 
   async function onSaveDisposition() {
@@ -60,23 +63,20 @@ export function LeadCallPanel({
   }
 
   async function onConvertDonor() {
-    if (aadhaarHash.length !== 64) {
-      toast.error("Aadhaar hash must be 64-char SHA-256 (collected at convert)");
-      return;
-    }
     setPending(true);
     const result = await convertDonorAction(leadId, {
       dob,
       gender,
       siteId,
-      aadhaarHash,
+      preferredIntakeAt: preferredIntakeAt || undefined,
+      coordinatorUserId: coordinatorUserId || undefined,
     });
     setPending(false);
     if (!result.ok) {
       toast.error(result.error);
       return;
     }
-    toast.success("Converted to donor (P0 Intake)");
+    toast.success("Converted to donor (P0 Intake — Aadhaar at screening)");
     router.refresh();
   }
 
@@ -137,39 +137,67 @@ export function LeadCallPanel({
         <div className="space-y-3 border-t border-stone-200 pt-4">
           <h3 className="font-medium">Convert to Donor</h3>
           <p className="text-xs text-stone-500">
-            Calls existing createDonorIntake — donor starts at P0_INTAKE.
+            Creates donor at P0_INTAKE via createDonorIntake. Aadhaar is
+            collected later at full intake screening (STAGE_2 consent).
           </p>
-          <Input
-            type="date"
-            value={dob}
-            onChange={(e) => setDob(e.target.value)}
-            placeholder="DOB"
-          />
-          <select
-            className="flex h-10 w-full rounded-md border border-stone-300 px-3 text-sm"
-            value={gender}
-            onChange={(e) => setGender(e.target.value as "M" | "F" | "O")}
-          >
-            <option value="M">M</option>
-            <option value="F">F</option>
-            <option value="O">O</option>
-          </select>
-          <select
-            className="flex h-10 w-full rounded-md border border-stone-300 px-3 text-sm"
-            value={siteId}
-            onChange={(e) => setSiteId(e.target.value)}
-          >
-            {sites.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.code} — {s.name}
-              </option>
-            ))}
-          </select>
-          <Input
-            value={aadhaarHash}
-            onChange={(e) => setAadhaarHash(e.target.value)}
-            placeholder="Aadhaar SHA-256 hash (64 chars)"
-          />
+          <div className="space-y-2">
+            <Label>Date of birth</Label>
+            <Input
+              type="date"
+              value={dob}
+              onChange={(e) => setDob(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Gender</Label>
+            <select
+              className="flex h-10 w-full rounded-md border border-stone-300 px-3 text-sm"
+              value={gender}
+              onChange={(e) => setGender(e.target.value as "M" | "F" | "O")}
+            >
+              <option value="M">M</option>
+              <option value="F">F</option>
+              <option value="O">O</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label>Site</Label>
+            <select
+              className="flex h-10 w-full rounded-md border border-stone-300 px-3 text-sm"
+              value={siteId}
+              onChange={(e) => setSiteId(e.target.value)}
+            >
+              {sites.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.code} — {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label>Preferred intake appointment (optional)</Label>
+            <Input
+              type="date"
+              value={preferredIntakeAt}
+              onChange={(e) => setPreferredIntakeAt(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Assign coordinator (optional)</Label>
+            <select
+              className="flex h-10 w-full rounded-md border border-stone-300 px-3 text-sm"
+              value={coordinatorUserId}
+              onChange={(e) => setCoordinatorUserId(e.target.value)}
+            >
+              <option value="">— Unassigned —</option>
+              {coordinators.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.email}
+                </option>
+              ))}
+            </select>
+          </div>
           <Button disabled={pending || !dob || !siteId} onClick={onConvertDonor}>
             Convert to Donor
           </Button>

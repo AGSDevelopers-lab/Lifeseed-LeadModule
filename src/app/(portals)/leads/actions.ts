@@ -6,6 +6,7 @@ import {
   CounsellingMode,
   DncSource,
   LeadStatus,
+  LeadTier,
   SlaEntityType,
   UserRole,
 } from "@prisma/client";
@@ -267,9 +268,11 @@ export async function convertDonorAction(
     dob: string;
     gender: "M" | "F" | "O";
     siteId: string;
-    aadhaarHash: string;
+    aadhaarHash?: string;
     hasLivingChild?: boolean;
     maritalStatus?: string;
+    preferredIntakeAt?: string;
+    coordinatorUserId?: string;
   },
 ): Promise<ActionResult> {
   try {
@@ -336,6 +339,7 @@ export async function addToDnc(input: {
     });
     revalidatePath("/telecaller/do-not-call");
     revalidatePath("/admin/leads/do-not-call");
+    revalidatePath("/admin/leads");
     return { ok: true, id: row.id };
   } catch (e) {
     return catchErr(e);
@@ -350,6 +354,8 @@ export async function reassignLead(
     const session = await requirePermission("lead.assign");
     await assignLead(leadId, session.userId, telecallerId);
     revalidatePath("/admin/leads");
+    revalidatePath(`/admin/leads/${leadId}`);
+    revalidatePath(`/telecaller/leads/${leadId}`);
     return { ok: true };
   } catch (e) {
     return catchErr(e);
@@ -365,4 +371,84 @@ export async function listCounsellors() {
     select: { id: true, email: true },
     take: 50,
   });
+}
+
+/** Soft-archive: tier ARCHIVED + status LOST. */
+export async function archiveLead(leadId: string): Promise<ActionResult> {
+  try {
+    const session = await requirePermission("lead.archive");
+    const before = await prisma.lead.findUnique({ where: { id: leadId } });
+    if (!before) return { ok: false, error: "Lead not found" };
+    if (before.status === LeadStatus.CONVERTED) {
+      return { ok: false, error: "Converted leads cannot be archived" };
+    }
+    await prisma.lead.update({
+      where: { id: leadId },
+      data: {
+        tier: LeadTier.ARCHIVED,
+        status: LeadStatus.LOST,
+        lostReason: "Archived by admin",
+        lastActivityAt: new Date(),
+      },
+    });
+    await audit.log({
+      actorUserId: session.userId,
+      action: "lead.archive",
+      entityType: "Lead",
+      entityId: leadId,
+      beforeJson: { status: before.status, tier: before.tier },
+      afterJson: { status: LeadStatus.LOST, tier: LeadTier.ARCHIVED },
+    });
+    revalidatePath("/admin/leads");
+    revalidatePath(`/admin/leads/${leadId}`);
+    return { ok: true };
+  } catch (e) {
+    return catchErr(e);
+  }
+}
+
+/** Force PII redact — BANK_SUPER_ADMIN via lead.purge. */
+export async function forcePurgeLead(leadId: string): Promise<ActionResult> {
+  try {
+    const session = await requirePermission("lead.purge");
+    const before = await prisma.lead.findUnique({ where: { id: leadId } });
+    if (!before) return { ok: false, error: "Lead not found" };
+    if (before.status === LeadStatus.CONVERTED) {
+      return { ok: false, error: "Converted leads cannot be purged" };
+    }
+    const now = new Date();
+    await prisma.lead.update({
+      where: { id: leadId },
+      data: {
+        status: LeadStatus.EXPIRED_AUTO_PURGED,
+        fullName: null,
+        phone: null,
+        email: null,
+        city: null,
+        state: null,
+        pincode: null,
+        consentIp: null,
+        consentUserAgent: null,
+        lastActivityAt: now,
+      },
+    });
+    await audit.log({
+      actorUserId: session.userId,
+      action: "lead.purge",
+      entityType: "Lead",
+      entityId: leadId,
+      afterJson: {
+        leadCode: before.leadCode,
+        score: before.score,
+        tier: before.tier,
+        source: before.source,
+        forced: true,
+      },
+    });
+    revalidatePath("/admin/leads");
+    revalidatePath(`/admin/leads/${leadId}`);
+    return { ok: true };
+  } catch (e) {
+    return catchErr(e);
+  }
 }

@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createHash } from "crypto";
 
 /** Server-side hash helper (consent text, etc. — never for raw Aadhaar ingress). */

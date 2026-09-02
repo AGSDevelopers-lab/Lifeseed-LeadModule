@@ -3,28 +3,35 @@ import {
   LeadPersonType,
   LeadStatus,
   SiteCode,
+  SlaEntityType,
+  type Prisma,
 } from "@prisma/client";
 
 import { createDonorIntake } from "@/app/(portals)/admin/donors/actions";
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { markCompletedByEntity } from "@/lib/sla/engine";
-import { SlaEntityType } from "@prisma/client";
 
 export type DonorConvertExtras = {
   dob: string;
   gender: "M" | "F" | "O";
   siteId: string;
-  aadhaarHash: string;
+  /** Deferred until P1 screening + STAGE_2 consent (DPDP). */
+  aadhaarHash?: string;
   maritalStatus?: string;
   hasLivingChild?: boolean;
   panMasked?: string;
   addressLine?: string;
+  /** Preferred date for full intake screening appointment (telecall handoff). */
+  preferredIntakeAt?: string;
+  /** Bank coordinator user id for handoff (optional). */
+  coordinatorUserId?: string;
 };
 
 /**
  * Convert qualified DONOR lead → Donor via existing createDonorIntake.
  * Caller must hold donor.create (TELECALLER/OPS granted for conversion path).
+ * Aadhaar is optional here — collected later at P1 with STAGE_2 consent.
  */
 export async function convertLeadToDonor(
   leadId: string,
@@ -58,6 +65,11 @@ export async function convertLeadToDonor(
   const type =
     lead.donorSubType === "OOCYTE" ? DonorType.OOCYTE : DonorType.SEMEN;
 
+  const aadhaarHash =
+    extras.aadhaarHash && extras.aadhaarHash.length === 64
+      ? extras.aadhaarHash
+      : undefined;
+
   const result = await createDonorIntake({
     fullName: lead.fullName,
     dob: extras.dob,
@@ -72,7 +84,7 @@ export async function convertLeadToDonor(
     pincode: lead.pincode ?? undefined,
     maritalStatus: extras.maritalStatus,
     hasLivingChild: extras.hasLivingChild,
-    aadhaarHash: extras.aadhaarHash,
+    aadhaarHash,
     panMasked: extras.panMasked,
   });
 
@@ -86,6 +98,11 @@ export async function convertLeadToDonor(
     data: { sourceLeadId: leadId },
   });
 
+  const prevMeta =
+    lead.sourceMetadata && typeof lead.sourceMetadata === "object"
+      ? (lead.sourceMetadata as Record<string, unknown>)
+      : {};
+
   await prisma.lead.update({
     where: { id: leadId },
     data: {
@@ -95,6 +112,12 @@ export async function convertLeadToDonor(
       convertedByUserId: actorId,
       retentionExpiresAt: null,
       lastActivityAt: new Date(),
+      sourceMetadata: {
+        ...prevMeta,
+        preferredIntakeAt: extras.preferredIntakeAt ?? null,
+        coordinatorUserId: extras.coordinatorUserId ?? null,
+        aadhaarDeferred: !aadhaarHash,
+      } as Prisma.InputJsonValue,
     },
   });
 
@@ -111,8 +134,29 @@ export async function convertLeadToDonor(
     entityType: "Lead",
     entityId: leadId,
     donorRelId: donorId,
-    afterJson: { donorId, leadCode: lead.leadCode },
+    afterJson: {
+      donorId,
+      leadCode: lead.leadCode,
+      preferredIntakeAt: extras.preferredIntakeAt ?? null,
+      coordinatorUserId: extras.coordinatorUserId ?? null,
+      aadhaarDeferred: !aadhaarHash,
+    },
   });
+
+  if (!aadhaarHash) {
+    await audit.log({
+      actorUserId: actorId,
+      action: "lead.converted.aadhaar_deferred",
+      entityType: "Donor",
+      entityId: donorId,
+      donorRelId: donorId,
+      afterJson: {
+        leadId,
+        leadCode: lead.leadCode,
+        reason: "Aadhaar deferred until P1 screening + STAGE_2 consent (DPDP)",
+      },
+    });
+  }
 
   return { ok: true, donorId };
 }

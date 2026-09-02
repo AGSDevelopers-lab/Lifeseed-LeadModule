@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { prisma } from "@/lib/db";
-import { PHASE_LABEL, REJECTION_CODE_LABEL } from "@/lib/donor-phase";
+import { PHASE_LABEL, REJECTION_CODE_LABEL } from "@/lib/donor-phase-labels";
 import {
   getSession,
   permissionGranted,
@@ -96,14 +96,12 @@ export default async function DonorDetailPage({
               ? "SEEDSCORE"
               : "P0_INTAKE";
 
-  const canSeedScoreView = permissionGranted(
-    permissionsForRoles(session.roles),
-    "seedscore.view",
-  );
-  const canRecalc = permissionGranted(
-    permissionsForRoles(session.roles),
-    "seedscore.recalc.manual",
-  );
+  const perms = permissionsForRoles(session.roles);
+  const canSeedScoreView = permissionGranted(perms, "seedscore.view");
+  const canRecalc = permissionGranted(perms, "seedscore.recalc.manual");
+  const canEdit = permissionGranted(perms, "donor.edit");
+  const canUndefer = permissionGranted(perms, "donor.undefer");
+  const isDeferred = donor.status === "DEFERRED";
 
   return (
     <div className="space-y-6">
@@ -122,18 +120,33 @@ export default async function DonorDetailPage({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          {canEdit && (
+            <Link href={`/admin/donors/${donor.id}/edit`}>
+              <Button variant="outline">Edit donor</Button>
+            </Link>
+          )}
           <Link href={`/admin/donors/${donor.id}/consent`}>
             <Button variant="outline">Capture consent</Button>
           </Link>
           <Link href={`/admin/donors/${donor.id}/screening`}>
             <Button variant="outline">Enter serology</Button>
           </Link>
-          <Link href={`/admin/donors/${donor.id}/defer`}>
-            <Button variant="outline">Defer</Button>
-          </Link>
-          <Link href={`/admin/donors/${donor.id}/reject`}>
-            <Button variant="destructive">Reject</Button>
-          </Link>
+          {isDeferred ? (
+            canUndefer && (
+              <Link href={`/admin/donors/${donor.id}/undefer`}>
+                <Button>Un-defer</Button>
+              </Link>
+            )
+          ) : (
+            <>
+              <Link href={`/admin/donors/${donor.id}/defer`}>
+                <Button variant="outline">Defer</Button>
+              </Link>
+              <Link href={`/admin/donors/${donor.id}/reject`}>
+                <Button variant="destructive">Reject</Button>
+              </Link>
+            </>
+          )}
         </div>
       </div>
 
@@ -161,7 +174,9 @@ export default async function DonorDetailPage({
         )}
         {activeTab === "P2_ACTIVE" && <ActiveSummary donor={donor} />}
         {activeTab === "P3_DRF" && <DrfSummary drfs={drfs} />}
-        {activeTab === "P4_OUTCOME" && <OutcomeSummary donor={donor} />}
+        {activeTab === "P4_OUTCOME" && (
+          <OutcomeSummary donor={donor} canUndefer={canUndefer} />
+        )}
         {activeTab === "SEEDSCORE" && (
           <SeedScoreSummary
             donorId={donor.id}
@@ -459,6 +474,7 @@ function DrfSummary({
 
 function OutcomeSummary({
   donor,
+  canUndefer,
 }: {
   donor: {
     id: string;
@@ -467,6 +483,7 @@ function OutcomeSummary({
     outcomeNotes: string | null;
     deferredUntil: Date | null;
   };
+  canUndefer: boolean;
 }) {
   return (
     <div className="space-y-4">
@@ -490,12 +507,22 @@ function OutcomeSummary({
         <Item label="Notes" value={donor.outcomeNotes ?? "—"} />
       </dl>
       <div className="flex gap-2">
-        <Link href={`/admin/donors/${donor.id}/defer`}>
-          <Button variant="outline">Record deferral</Button>
-        </Link>
-        <Link href={`/admin/donors/${donor.id}/reject`}>
-          <Button variant="destructive">Record rejection</Button>
-        </Link>
+        {donor.status === "DEFERRED" ? (
+          canUndefer && (
+            <Link href={`/admin/donors/${donor.id}/undefer`}>
+              <Button>Un-defer</Button>
+            </Link>
+          )
+        ) : (
+          <>
+            <Link href={`/admin/donors/${donor.id}/defer`}>
+              <Button variant="outline">Record deferral</Button>
+            </Link>
+            <Link href={`/admin/donors/${donor.id}/reject`}>
+              <Button variant="destructive">Record rejection</Button>
+            </Link>
+          </>
+        )}
       </div>
     </div>
   );

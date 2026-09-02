@@ -19,7 +19,7 @@ import {
 import {
   DEFERRABLE_CODES,
   REJECTION_CODE_LABEL,
-} from "@/lib/donor-phase";
+} from "@/lib/donor-phase-labels";
 
 export function DeferRejectForm({
   mode,

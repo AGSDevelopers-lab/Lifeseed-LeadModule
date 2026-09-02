@@ -20,6 +20,7 @@ import {
   Label,
 } from "@/components/ui/primitives";
 import {
+  aadhaarRequiredSchema,
   computeBmi,
   maskPanClient,
   sha256HexBrowser,
@@ -39,9 +40,7 @@ const formSchema = z.object({
   pincode: z.string().optional(),
   maritalStatus: z.string().optional(),
   hasLivingChild: z.boolean().optional(),
-  aadhaar: z
-    .string()
-    .regex(/^[2-9]\d{11}$/, "Enter a 12-digit Aadhaar number"),
+  aadhaar: aadhaarRequiredSchema,
   pan: z.string().optional(),
   height: z.string().optional(),
   weight: z.string().optional(),
@@ -58,6 +57,7 @@ export function DonorIntakeForm({
   const [loading, setLoading] = useState(false);
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
+    mode: "onChange",
     defaultValues: {
       fullName: "",
       dob: "",

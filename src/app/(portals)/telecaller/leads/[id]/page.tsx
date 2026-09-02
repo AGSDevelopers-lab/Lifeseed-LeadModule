@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { LeadStatus } from "@prisma/client";
+import { LeadStatus, UserRole } from "@prisma/client";
 
 import { LeadCallPanel } from "@/app/(portals)/telecaller/leads/[id]/lead-call-panel";
 import { Button, Card, CardContent, CardHeader, CardTitle } from "@/components/ui/primitives";
@@ -50,6 +50,20 @@ export default async function TelecallerLeadDetailPage({
     select: { id: true, name: true, clinicCode: true },
     take: 50,
   });
+  const coordinators = await prisma.user.findMany({
+    where: {
+      isActive: true,
+      roles: {
+        some: {
+          role: {
+            in: [UserRole.BANK_DONOR_COORD, UserRole.BANK_SUPER_ADMIN],
+          },
+        },
+      },
+    },
+    select: { id: true, email: true },
+    take: 50,
+  });
 
   return (
     <div className="space-y-6">
@@ -88,6 +102,7 @@ export default async function TelecallerLeadDetailPage({
         canConvert={canConvert}
         sites={sites}
         clinics={clinics}
+        coordinators={coordinators}
       />
 
       <Card>

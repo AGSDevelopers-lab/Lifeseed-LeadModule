@@ -1,3 +1,5 @@
+import "server-only";
+
 import {
   DrfState,
   type DRF,

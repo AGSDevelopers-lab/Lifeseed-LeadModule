@@ -1,6 +1,7 @@
-import { cn } from "@/lib/utils";
-import { PHASE_LABEL } from "@/lib/donor-phase";
 import type { DonorPhase, DonorStatus } from "@prisma/client";
+
+import { PHASE_LABEL } from "@/lib/donor-phase-labels";
+import { cn } from "@/lib/utils";
 
 export function PhaseBadge({ phase }: { phase: DonorPhase }) {
   return (

@@ -14,7 +14,7 @@ import {
   CardTitle,
   Label,
 } from "@/components/ui/primitives";
-import { ICMR_SEROLOGY_TESTS } from "@/lib/donor-phase";
+import { ICMR_SEROLOGY_TESTS } from "@/lib/donor-phase-labels";
 
 type Result = "NEG" | "POS";
 

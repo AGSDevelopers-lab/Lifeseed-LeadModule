@@ -1,3 +1,5 @@
+import "server-only";
+
 import {
   SampleState,
   type Prisma,

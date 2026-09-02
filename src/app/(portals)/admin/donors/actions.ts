@@ -6,6 +6,7 @@ import {
   DonorType,
   RejectionCode,
   SiteCode,
+  type Prisma,
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
@@ -32,7 +33,9 @@ const intakeSchema = z.object({
   pincode: z.string().optional(),
   maritalStatus: z.string().optional(),
   hasLivingChild: z.boolean().optional(),
-  aadhaarHash: z.string().length(64),
+  aadhaarHash: z
+    .union([z.string().length(64), z.literal("")])
+    .optional(),
   panMasked: z.string().optional(),
   height: z.number().int().positive().optional(),
   weight: z.number().int().positive().optional(),
@@ -93,7 +96,10 @@ export async function createDonorIntake(
         fullName: data.fullName,
         dob: new Date(data.dob),
         gender: data.gender,
-        aadhaarHash: data.aadhaarHash,
+        aadhaarHash:
+          data.aadhaarHash && data.aadhaarHash.length === 64
+            ? data.aadhaarHash
+            : null,
         panMasked: data.panMasked || null,
         phone: data.phone,
         email: data.email || null,
@@ -367,6 +373,226 @@ export async function rejectDonor(
       afterJson: {
         rejectionCode: parsed.data.rejectionCode,
         notes: parsed.data.notes ?? null,
+      },
+    });
+
+    revalidatePath(`/admin/donors/${updated.id}`);
+    revalidatePath("/admin/donors");
+    return { ok: true };
+  } catch (err) {
+    return catchPerm(err);
+  }
+}
+
+const indianMobile = z
+  .string()
+  .regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit Indian mobile number");
+
+const updateProfileSchema = z.object({
+  donorId: z.string().min(1),
+  phone: indianMobile.optional(),
+  email: z.string().email().optional().or(z.literal("")),
+  addressLine: z.string().optional().or(z.literal("")),
+  city: z.string().optional().or(z.literal("")),
+  stateCode: z.string().optional().or(z.literal("")),
+  pincode: z
+    .string()
+    .regex(/^\d{6}$/, "PIN must be 6 digits")
+    .optional()
+    .or(z.literal("")),
+  maritalStatus: z.string().optional().or(z.literal("")),
+  hasLivingChild: z.boolean().optional(),
+  height: z.number().int().positive().optional().nullable(),
+  weight: z.number().int().positive().optional().nullable(),
+  bmi: z.number().positive().optional().nullable(),
+  panMasked: z.string().optional().or(z.literal("")),
+  aadhaarHash: z
+    .union([z.string().length(64), z.literal("")])
+    .optional(),
+});
+
+export async function updateDonorProfile(
+  input: z.infer<typeof updateProfileSchema>,
+): Promise<ActionResult> {
+  try {
+    const session = await requirePermission("donor.edit");
+    const parsed = updateProfileSchema.safeParse(input);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: parsed.error.issues[0]?.message ?? "Validation failed",
+      };
+    }
+    const data = parsed.data;
+
+    const donor = await prisma.donor.findUnique({
+      where: { id: data.donorId },
+    });
+    if (!donor) return { ok: false, error: "Donor not found" };
+
+    const before: Record<string, Prisma.InputJsonValue | null> = {};
+    const after: Record<string, Prisma.InputJsonValue | null> = {};
+    const updateData: {
+      phone?: string;
+      email?: string | null;
+      addressLine?: string | null;
+      city?: string | null;
+      stateCode?: string | null;
+      pincode?: string | null;
+      maritalStatus?: string | null;
+      hasLivingChild?: boolean | null;
+      height?: number | null;
+      weight?: number | null;
+      bmi?: number | null;
+      panMasked?: string | null;
+      aadhaarHash?: string | null;
+    } = {};
+
+    function asJson(
+      value: unknown,
+    ): Prisma.InputJsonValue | null {
+      if (value === null || value === undefined) return null;
+      if (
+        typeof value === "string" ||
+        typeof value === "number" ||
+        typeof value === "boolean"
+      ) {
+        return value;
+      }
+      return String(value);
+    }
+
+    function track<K extends keyof typeof updateData>(
+      key: K,
+      nextVal: (typeof updateData)[K],
+      prevVal: unknown,
+    ) {
+      if (nextVal === undefined) return;
+      const normalizedNext =
+        typeof nextVal === "string" && nextVal === "" ? null : nextVal;
+      if (normalizedNext === prevVal) return;
+      before[key] = asJson(prevVal);
+      after[key] = asJson(normalizedNext);
+      updateData[key] = normalizedNext as (typeof updateData)[K];
+    }
+
+    if (data.phone !== undefined) {
+      track("phone", data.phone, donor.phone);
+    }
+    if (data.email !== undefined) {
+      track("email", data.email || null, donor.email);
+    }
+    if (data.addressLine !== undefined) {
+      track("addressLine", data.addressLine || null, donor.addressLine);
+    }
+    if (data.city !== undefined) {
+      track("city", data.city || null, donor.city);
+    }
+    if (data.stateCode !== undefined) {
+      track("stateCode", data.stateCode || null, donor.stateCode);
+    }
+    if (data.pincode !== undefined) {
+      track("pincode", data.pincode || null, donor.pincode);
+    }
+    if (data.maritalStatus !== undefined) {
+      track("maritalStatus", data.maritalStatus || null, donor.maritalStatus);
+    }
+    if (data.hasLivingChild !== undefined) {
+      track("hasLivingChild", data.hasLivingChild, donor.hasLivingChild);
+    }
+    if (data.height !== undefined) {
+      track("height", data.height, donor.height);
+    }
+    if (data.weight !== undefined) {
+      track("weight", data.weight, donor.weight);
+    }
+    if (data.bmi !== undefined) {
+      track("bmi", data.bmi, donor.bmi);
+    }
+    if (data.panMasked !== undefined && data.panMasked !== "") {
+      track("panMasked", data.panMasked, donor.panMasked);
+    }
+    if (data.aadhaarHash !== undefined && data.aadhaarHash !== "") {
+      track("aadhaarHash", data.aadhaarHash, donor.aadhaarHash);
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return { ok: false, error: "No changes to save" };
+    }
+
+    const updated = await prisma.donor.update({
+      where: { id: donor.id },
+      data: updateData,
+    });
+
+    await audit.log({
+      actorUserId: session.userId,
+      action: "donor.profile.updated",
+      entityType: "Donor",
+      entityId: updated.id,
+      donorRelId: updated.id,
+      beforeJson: before,
+      afterJson: after,
+    });
+
+    revalidatePath(`/admin/donors/${updated.id}`);
+    revalidatePath("/admin/donors");
+    return { ok: true, id: updated.id };
+  } catch (err) {
+    return catchPerm(err);
+  }
+}
+
+const undeferSchema = z.object({
+  donorId: z.string().min(1),
+  reason: z.string().min(3, "Reason is required"),
+});
+
+export async function undeferDonor(
+  input: z.infer<typeof undeferSchema>,
+): Promise<ActionResult> {
+  try {
+    const session = await requirePermission("donor.undefer");
+    const parsed = undeferSchema.safeParse(input);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: parsed.error.issues[0]?.message ?? "Validation failed",
+      };
+    }
+
+    const donor = await prisma.donor.findUnique({
+      where: { id: parsed.data.donorId },
+    });
+    if (!donor) return { ok: false, error: "Donor not found" };
+    if (donor.status !== DonorStatus.DEFERRED) {
+      return { ok: false, error: "Donor is not deferred" };
+    }
+
+    const updated = await prisma.donor.update({
+      where: { id: donor.id },
+      data: {
+        status: DonorStatus.ELIGIBLE,
+        deferredUntil: null,
+        outcomeNotes: parsed.data.reason,
+      },
+    });
+
+    await audit.log({
+      actorUserId: session.userId,
+      action: "donor.undeferred",
+      entityType: "Donor",
+      entityId: updated.id,
+      donorRelId: updated.id,
+      beforeJson: {
+        status: donor.status,
+        deferredUntil: donor.deferredUntil?.toISOString() ?? null,
+        outcomeNotes: donor.outcomeNotes,
+      },
+      afterJson: {
+        status: DonorStatus.ELIGIBLE,
+        deferredUntil: null,
+        reason: parsed.data.reason,
       },
     });
 
