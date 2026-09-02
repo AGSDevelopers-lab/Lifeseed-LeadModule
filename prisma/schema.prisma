@@ -72,6 +72,11 @@ enum UserRole {
   BANK_MEDICAL_DIRECTOR
   BANK_BRM
   BANK_SUPER_ADMIN
+  TELECALLER
+  COUNSELLOR
+  OPS_MANAGER
+  MARKETING_MANAGER
+  CRM_ADMIN
   L2_IVF_CLINICIAN
   L2_EMBRYOLOGIST
   L2_SR_EMBRYOLOGIST
@@ -97,6 +102,11 @@ model User {
 
   chakraQuestionsCreated ChakraQuestion[] @relation("ChakraQuestionAuthor")
   rubricVersionsPublished RubricVersion[] @relation("RubricVersionPublisher")
+
+  assignedLeads Lead[] @relation("LeadTelecaller")
+  callDispositions CallDisposition[] @relation("CallDispositionTelecaller")
+  counsellingSessions CounsellingBooking[] @relation("CounsellingCounsellor")
+  dncEntries LeadDoNotCallList[] @relation("DncAddedBy")
 
   createdAt   DateTime  @default(now())
   lastLoginAt DateTime?
@@ -222,6 +232,10 @@ model Donor {
   firstScoredAt       DateTime?
   lastScoredAt        DateTime?
   scoreRecalcRequired Boolean         @default(false)
+
+  /// Upstream Lead Management link (nullable — pre-Lead donors stay null)
+  sourceLeadId String? @unique
+  sourceLead   Lead?   @relation("LeadConvertedDonor", fields: [sourceLeadId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -577,6 +591,10 @@ model Recipient {
   packageTier   PackageTier   @default(BASIC)
   selectionMode SelectionMode @default(ANONYMOUS)
   engineSubs    String[]
+
+  /// Upstream Lead Management link (nullable)
+  sourceLeadId String? @unique
+  sourceLead   Lead?   @relation("LeadConvertedRecipient", fields: [sourceLeadId], references: [id])
 
   drfs      DRF[]
   createdAt DateTime @default(now())
@@ -1390,4 +1408,286 @@ model RubricVersion {
   notes            String?
 
   @@index([isActive])
+}
+
+// ===== LEAD MANAGEMENT (upstream of Donor Pathway + Recipient acquisition) =====
+
+enum LeadPersonType {
+  DONOR
+  RECIPIENT
+}
+
+enum LeadDonorSubType {
+  SEMEN
+  OOCYTE
+}
+
+enum LeadSource {
+  WEB_FORM
+  WHATSAPP_BOT
+  PHONE_INBOUND
+  WALK_IN
+  REFERRAL
+  SOCIAL_FACEBOOK
+  SOCIAL_INSTAGRAM
+  SOCIAL_GOOGLE_ADS
+  CLINIC_REFERRAL
+  PARTNER_HOSPITAL
+  OTHER
+}
+
+enum LeadTier {
+  HOT
+  WARM
+  COLD
+  ARCHIVED
+}
+
+enum LeadStatus {
+  NEW
+  ASSIGNED
+  CONTACTED_QUALIFIED
+  CONTACTED_NOT_INTERESTED
+  CONTACTED_CALLBACK_REQUESTED
+  NOT_REACHABLE
+  WRONG_NUMBER
+  DO_NOT_CALL
+  COUNSELLING_BOOKED
+  COUNSELLING_ATTENDED
+  COUNSELLING_NO_SHOW
+  CONVERTED
+  LOST
+  EXPIRED_AUTO_PURGED
+}
+
+enum CallDispositionType {
+  CONTACTED_QUALIFIED
+  CONTACTED_NOT_INTERESTED
+  CONTACTED_CALLBACK_REQUESTED
+  NOT_REACHABLE
+  WRONG_NUMBER
+  DO_NOT_CALL
+  LOST
+}
+
+enum CounsellingMode {
+  IN_PERSON
+  VIDEO_CALL
+  PHONE
+}
+
+enum CounsellingBookingStatus {
+  BOOKED
+  ATTENDED
+  NO_SHOW
+  RESCHEDULED
+  CANCELLED
+}
+
+enum SlaStatus {
+  PENDING
+  ACTIVE
+  WARNING_25PCT
+  WARNING_50PCT
+  BREACHED
+  COMPLETED
+}
+
+enum SlaEntityType {
+  LEAD_RESPONSE
+  LEAD_QUALIFICATION
+  COUNSELLING_BOOKING
+  COUNSELLING_REMINDER
+  DONOR_SCREENING
+  DONOR_CONSENT
+  EMBRYOLOGY_OUTCOME
+}
+
+enum CrmSyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+  RETRYING
+  SKIPPED
+}
+
+enum CrmEntityType {
+  LEAD
+  DONOR
+  RECIPIENT
+}
+
+enum CrmSyncTarget {
+  ZOHO
+  SALESFORCE
+}
+
+enum DncSource {
+  SELF_REQUEST
+  OPS_ADD
+  COMPLIANCE_ADD
+}
+
+model Lead {
+  id               String            @id @default(cuid())
+  leadCode         String            @unique
+  personType       LeadPersonType
+  donorSubType     LeadDonorSubType?
+  source           LeadSource
+  sourceMetadata   Json?
+  capturedAt       DateTime          @default(now())
+  fullName         String?
+  phone            String?
+  phoneCountryCode String            @default("+91")
+  email            String?
+  city             String?
+  state            String?
+  pincode          String?
+  ageGroup         String?
+  preferredLanguage String?
+  score            Int               @default(0)
+  scoreBreakdown   Json?
+  tier             LeadTier          @default(COLD)
+  status           LeadStatus        @default(NEW)
+
+  assignedTelecallerId String?
+  assignedTelecaller   User?     @relation("LeadTelecaller", fields: [assignedTelecallerId], references: [id])
+  assignedAt           DateTime?
+
+  slaResponseDueAt DateTime?
+  slaQualifyDueAt  DateTime?
+
+  convertedDonorId     String? @unique
+  convertedRecipientId String? @unique
+  convertedAt          DateTime?
+  convertedByUserId    String?
+  lostReason           String?
+  doNotCallFlag        Boolean @default(false)
+
+  consentMarketing       Boolean @default(false)
+  consentScreening       Boolean @default(false)
+  consentDataProcessing  Boolean @default(false)
+  consentVersion         String?
+  consentIp              String?
+  consentUserAgent       String?
+
+  retentionExpiresAt DateTime?
+  lastActivityAt     DateTime  @default(now())
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  callDispositions    CallDisposition[]
+  counsellingBooking  CounsellingBooking?
+  convertedDonor      Donor?     @relation("LeadConvertedDonor")
+  convertedRecipient  Recipient? @relation("LeadConvertedRecipient")
+
+  @@index([status])
+  @@index([tier])
+  @@index([personType])
+  @@index([assignedTelecallerId])
+  @@index([retentionExpiresAt])
+  @@index([phone])
+}
+
+model CallDisposition {
+  id              String               @id @default(cuid())
+  leadId          String
+  lead            Lead                 @relation(fields: [leadId], references: [id])
+  telecallerId    String
+  telecaller      User                 @relation("CallDispositionTelecaller", fields: [telecallerId], references: [id])
+  callStartedAt   DateTime
+  callEndedAt     DateTime?
+  durationSeconds Int?
+  disposition     CallDispositionType
+  notes           String?
+  followupAt      DateTime?
+  qaScore         Int?
+  qaSampledByUserId String?
+  qaSampledAt     DateTime?
+  recordingUrl    String?
+  createdAt       DateTime             @default(now())
+
+  @@index([leadId])
+  @@index([telecallerId])
+}
+
+model CounsellingBooking {
+  id              String                   @id @default(cuid())
+  leadId          String                   @unique
+  lead            Lead                     @relation(fields: [leadId], references: [id])
+  bookedAt        DateTime                 @default(now())
+  scheduledAt     DateTime
+  durationMinutes Int                      @default(30)
+  mode            CounsellingMode
+  counsellorUserId String
+  counsellor      User                     @relation("CounsellingCounsellor", fields: [counsellorUserId], references: [id])
+  meetingUrl      String?
+  meetingLocation String?
+  reminderSentAt  DateTime?
+  status          CounsellingBookingStatus @default(BOOKED)
+  attendedAt      DateTime?
+  cancelledAt     DateTime?
+  cancelledReason String?
+  followupNotes   String?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  @@index([counsellorUserId, scheduledAt])
+  @@index([status])
+}
+
+model SlaSchedule {
+  id                   String       @id @default(cuid())
+  entityType           SlaEntityType
+  entityId             String
+  stageKey             String
+  startedAt            DateTime
+  responseWithinHours  Int
+  completeWithinHours  Int?
+  responseDueAt        DateTime
+  completeDueAt        DateTime?
+  respondedAt          DateTime?
+  completedAt          DateTime?
+  status               SlaStatus    @default(ACTIVE)
+  lastEscalationLevel  Int          @default(0)
+  lastEscalationAt     DateTime?
+  escalationLadder     Json?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  @@index([status, responseDueAt])
+  @@index([entityType, entityId])
+  @@unique([entityType, entityId, stageKey])
+}
+
+model CrmSyncQueue {
+  id            String        @id @default(cuid())
+  entityType    CrmEntityType
+  entityId      String
+  syncTarget    CrmSyncTarget
+  payload       Json
+  status        CrmSyncStatus @default(PENDING)
+  attempts      Int           @default(0)
+  lastAttemptAt DateTime?
+  lastError     String?
+  scheduledFor  DateTime      @default(now())
+  succeededAt   DateTime?
+  createdAt     DateTime      @default(now())
+
+  @@index([status, scheduledFor])
+  @@index([entityType, entityId])
+}
+
+model LeadDoNotCallList {
+  id          String    @id @default(cuid())
+  phone       String    @unique
+  email       String?
+  reason      String
+  addedByUserId String?
+  addedBy     User?     @relation("DncAddedBy", fields: [addedByUserId], references: [id])
+  addedAt     DateTime  @default(now())
+  expiresAt   DateTime?
+  source      DncSource @default(OPS_ADD)
+
+  @@index([email])
 }

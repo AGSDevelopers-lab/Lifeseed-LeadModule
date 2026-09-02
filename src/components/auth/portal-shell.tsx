@@ -8,6 +8,7 @@ import {
   CreditCard,
   FileText,
   FlaskConical,
+  Headset,
   LayoutDashboard,
   LogOut,
   Microscope,
@@ -43,7 +44,9 @@ type NavIconKind =
   | "finance"
   | "cycles"
   | "cohorts"
-  | "outcomes";
+  | "outcomes"
+  | "leads"
+  | "headset";
 
 type NavItem = {
   href: string;
@@ -56,6 +59,16 @@ const NAV: Record<PortalKind, NavItem[]> = {
   admin: [
     { href: "/admin", label: "Dashboard", icon: "dash" },
     { href: "/admin/users", label: "Users", icon: "users" },
+    {
+      href: "/admin/leads",
+      label: "Leads",
+      icon: "leads",
+      children: [
+        { href: "/admin/leads", label: "All Leads" },
+        { href: "/admin/leads/analytics", label: "Analytics" },
+        { href: "/admin/leads/do-not-call", label: "Do Not Call" },
+      ],
+    },
     { href: "/admin/donors", label: "Donors", icon: "donors" },
     { href: "/admin/samples", label: "Samples", icon: "samples" },
     { href: "/admin/cryobank", label: "Cryobank", icon: "cryo" },
@@ -90,6 +103,16 @@ const NAV: Record<PortalKind, NavItem[]> = {
   ],
   donor: [{ href: "/donor", label: "Dashboard", icon: "dash" }],
   recipient: [{ href: "/recipient", label: "Dashboard", icon: "dash" }],
+  telecaller: [
+    { href: "/telecaller/dashboard", label: "Dashboard", icon: "dash" },
+    { href: "/telecaller/queue", label: "My Queue", icon: "leads" },
+    { href: "/telecaller/leads", label: "All Leads", icon: "users" },
+    { href: "/telecaller/do-not-call", label: "Do Not Call", icon: "headset" },
+  ],
+  counsellor: [
+    { href: "/counsellor/dashboard", label: "Dashboard", icon: "dash" },
+    { href: "/counsellor/sessions", label: "Sessions", icon: "headset" },
+  ],
 };
 
 function NavIcon({ kind }: { kind?: NavIconKind }) {
@@ -109,6 +132,8 @@ function NavIcon({ kind }: { kind?: NavIconKind }) {
   if (kind === "cycles") return <Activity className={className} />;
   if (kind === "cohorts") return <Microscope className={className} />;
   if (kind === "outcomes") return <Activity className={className} />;
+  if (kind === "leads") return <Headset className={className} />;
+  if (kind === "headset") return <Headset className={className} />;
   return <LayoutDashboard className={className} />;
 }
 
@@ -122,9 +147,16 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
     : ("admin" as PortalKind);
 
   const activePortal: PortalKind =
-    (["admin", "clinic", "donor", "recipient"] as PortalKind[]).find((p) =>
-      pathname.startsWith(`/${p}`),
-    ) ?? primaryPortal;
+    (
+      [
+        "admin",
+        "clinic",
+        "donor",
+        "recipient",
+        "telecaller",
+        "counsellor",
+      ] as PortalKind[]
+    ).find((p) => pathname.startsWith(`/${p}`)) ?? primaryPortal;
 
   const links = NAV[activePortal];
 
@@ -189,7 +221,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
         </nav>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col">
         <header className="flex h-14 items-center justify-between border-b border-stone-200 bg-white px-4">
           <div className="truncate text-sm text-stone-600">{email}</div>
           <Button variant="outline" onClick={logout}>

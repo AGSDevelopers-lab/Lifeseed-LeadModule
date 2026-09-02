@@ -415,6 +415,88 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "seedscore.rubric.publish",
     "seedscore.question.author",
     "seedscore.override.tier",
+    "lead.list",
+    "lead.view",
+    "lead.create",
+    "lead.assign",
+    "lead.convert",
+    "lead.archive",
+    "lead.export",
+    "telecaller.dashboard",
+    "telecaller.queue",
+    "telecaller.disposition",
+    "telecaller.book_counselling",
+    "counsellor.dashboard",
+    "counsellor.sessions",
+    "counsellor.mark_attended",
+    "counselling.book",
+    "counselling.reschedule",
+    "counselling.cancel",
+    "dnc.list",
+    "dnc.add",
+    "dnc.remove",
+    "marketing.dashboard",
+    "marketing.analytics",
+    "ops.qa_sample",
+    "crm.sync.manual",
+    "crm.sync.retry",
+  ],
+  TELECALLER: [
+    "telecaller.dashboard",
+    "telecaller.queue",
+    "telecaller.disposition",
+    "telecaller.book_counselling",
+    "lead.view",
+    "lead.create",
+    "lead.convert",
+    "counselling.book",
+    "donor.create",
+    "dnc.list",
+    "dnc.add",
+  ],
+  COUNSELLOR: [
+    "counsellor.dashboard",
+    "counsellor.sessions",
+    "counsellor.mark_attended",
+    "lead.view",
+    "counselling.reschedule",
+    "counselling.cancel",
+  ],
+  OPS_MANAGER: [
+    "telecaller.dashboard",
+    "telecaller.queue",
+    "telecaller.disposition",
+    "telecaller.book_counselling",
+    "counsellor.dashboard",
+    "counsellor.sessions",
+    "counsellor.mark_attended",
+    "lead.list",
+    "lead.view",
+    "lead.create",
+    "lead.assign",
+    "lead.convert",
+    "lead.archive",
+    "ops.qa_sample",
+    "dnc.list",
+    "dnc.add",
+    "dnc.remove",
+    "counselling.book",
+    "counselling.reschedule",
+    "counselling.cancel",
+    "donor.create",
+  ],
+  MARKETING_MANAGER: [
+    "marketing.dashboard",
+    "marketing.analytics",
+    "lead.list",
+    "lead.view",
+    "lead.export",
+  ],
+  CRM_ADMIN: [
+    "crm.sync.manual",
+    "crm.sync.retry",
+    "lead.list",
+    "lead.view",
   ],
   L2_IVF_CLINICIAN: [
     "cycle_event.log",
@@ -464,11 +546,19 @@ export function permissionsForRoles(roles: UserRole[]): Permission[] {
   return [...new Set(roles.flatMap((role) => ROLE_PERMISSIONS[role] ?? []))];
 }
 
-export type PortalKind = "admin" | "clinic" | "donor" | "recipient";
+export type PortalKind =
+  | "admin"
+  | "clinic"
+  | "donor"
+  | "recipient"
+  | "telecaller"
+  | "counsellor";
 
 export function portalForRole(role: UserRole): PortalKind {
   if (role === "DONOR") return "donor";
   if (role === "RECIPIENT") return "recipient";
+  if (role === "TELECALLER") return "telecaller";
+  if (role === "COUNSELLOR") return "counsellor";
   if (role.startsWith("CLINIC_") || role.startsWith("L2_")) return "clinic";
   return "admin";
 }
@@ -483,6 +573,10 @@ export function portalHome(portal: PortalKind): string {
       return "/donor";
     case "recipient":
       return "/recipient";
+    case "telecaller":
+      return "/telecaller/dashboard";
+    case "counsellor":
+      return "/counsellor/dashboard";
   }
 }
 

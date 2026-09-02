@@ -10,6 +10,11 @@ const PUBLIC_PREFIXES = [
   "/api/webhooks",
   "/api/embryology/nudges",
   "/api/seedscore/recalc-scheduled",
+  "/api/leads/intake/web",
+  "/api/leads/intake/whatsapp",
+  "/api/leads/sla/run",
+  "/api/leads/crm-sync/run",
+  "/api/leads/purge-expired",
 ];
 
 const PROTECTED_PREFIXES = [
@@ -19,6 +24,8 @@ const PROTECTED_PREFIXES = [
   "/donor",
   "/recipient",
   "/portal",
+  "/telecaller",
+  "/counsellor",
 ];
 
 function isPublicPath(pathname: string): boolean {

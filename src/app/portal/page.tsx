@@ -35,6 +35,14 @@ const PORTAL_COPY: Record<
     title: "Recipient Portal",
     description: "Packages · matching · cycle status · payments",
   },
+  telecaller: {
+    title: "Telecaller Portal",
+    description: "Lead queue · dispositions · counselling booking",
+  },
+  counsellor: {
+    title: "Counsellor Portal",
+    description: "Sessions · attendance · registration recommend",
+  },
 };
 
 export default async function PortalPickerPage() {

@@ -3,6 +3,7 @@ import { DrfState, NudgeStatus, type Prisma } from "@prisma/client";
 import { audit } from "@/lib/audit";
 import { advanceDrf } from "@/lib/drf-state";
 import { prisma } from "@/lib/db";
+import { scheduleEmbryologyOutcomeSlas } from "@/lib/sla/migration-shim";
 
 const OFFSETS = [14, 30, 90, 180] as const;
 
@@ -24,6 +25,8 @@ export async function scheduleNudges(
       update: {}, // idempotent — do not reschedule if exists
     });
   }
+  // Also mirror onto generic SLA engine (backward-compatible)
+  await scheduleEmbryologyOutcomeSlas(drfId, transferredAt);
 }
 
 export async function runPendingNudges(actorUserId?: string | null): Promise<{
