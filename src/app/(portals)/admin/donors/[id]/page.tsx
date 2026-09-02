@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import type { DonorPhase, SeedScoreTier } from "@prisma/client";
 
 import { PhaseBadge, StatusPill } from "@/components/donor/badges";
 import { Button } from "@/components/ui/primitives";
@@ -18,15 +19,26 @@ import {
   permissionGranted,
   permissionsForRoles,
 } from "@/lib/rbac";
+import {
+  CHAKRA_LABEL,
+  CHAKRA_ORDER,
+  CHAKRA_WEIGHTS,
+  TIER_LABEL,
+} from "@/lib/seedscore/constants";
+import { tierBadgeClass } from "@/lib/seedscore/visibility";
 import { cn } from "@/lib/utils";
-import type { DonorPhase } from "@prisma/client";
 
-const TABS: Array<{ key: DonorPhase; hrefSuffix: string; label: string }> = [
+const TABS: Array<{
+  key: string;
+  hrefSuffix: string;
+  label: string;
+}> = [
   { key: "P0_INTAKE", hrefSuffix: "", label: "P0 Intake" },
   { key: "P1_SCREENING", hrefSuffix: "?tab=p1", label: "P1 Screening" },
   { key: "P2_ACTIVE", hrefSuffix: "?tab=p2", label: "P2 Active" },
   { key: "P3_DRF", hrefSuffix: "?tab=p3", label: "P3 DRF" },
   { key: "P4_OUTCOME", hrefSuffix: "?tab=p4", label: "P4 Outcome" },
+  { key: "SEEDSCORE", hrefSuffix: "?tab=seedscore", label: "SeedScore" },
 ];
 
 type Params = Promise<{ id: string }>;
@@ -59,6 +71,8 @@ export default async function DonorDetailPage({
         orderBy: { createdAt: "desc" },
         take: 20,
       },
+      seedScore: true,
+      seedScoreHistory: { orderBy: { versionNumber: "desc" }, take: 20 },
     },
   });
   if (!donor) notFound();
@@ -69,7 +83,7 @@ export default async function DonorDetailPage({
     orderBy: { createdAt: "desc" },
   });
 
-  const activeTab: DonorPhase =
+  const activeTab =
     tab === "p1"
       ? "P1_SCREENING"
       : tab === "p2"
@@ -78,7 +92,18 @@ export default async function DonorDetailPage({
           ? "P3_DRF"
           : tab === "p4"
             ? "P4_OUTCOME"
-            : "P0_INTAKE";
+            : tab === "seedscore"
+              ? "SEEDSCORE"
+              : "P0_INTAKE";
+
+  const canSeedScoreView = permissionGranted(
+    permissionsForRoles(session.roles),
+    "seedscore.view",
+  );
+  const canRecalc = permissionGranted(
+    permissionsForRoles(session.roles),
+    "seedscore.recalc.manual",
+  );
 
   return (
     <div className="space-y-6">
@@ -137,6 +162,17 @@ export default async function DonorDetailPage({
         {activeTab === "P2_ACTIVE" && <ActiveSummary donor={donor} />}
         {activeTab === "P3_DRF" && <DrfSummary drfs={drfs} />}
         {activeTab === "P4_OUTCOME" && <OutcomeSummary donor={donor} />}
+        {activeTab === "SEEDSCORE" && (
+          <SeedScoreSummary
+            donorId={donor.id}
+            tier={donor.currentTier}
+            score={donor.seedScore}
+            history={donor.seedScoreHistory}
+            scoreRecalcRequired={donor.scoreRecalcRequired}
+            canView={canSeedScoreView}
+            canRecalc={canRecalc}
+          />
+        )}
       </div>
     </div>
   );
@@ -460,6 +496,179 @@ function OutcomeSummary({
         <Link href={`/admin/donors/${donor.id}/reject`}>
           <Button variant="destructive">Record rejection</Button>
         </Link>
+      </div>
+    </div>
+  );
+}
+
+function SeedScoreSummary({
+  donorId,
+  tier,
+  score,
+  history,
+  scoreRecalcRequired,
+  canView,
+  canRecalc,
+}: {
+  donorId: string;
+  tier: SeedScoreTier | null;
+  score: {
+    totalScore: number;
+    tier: SeedScoreTier;
+    rootScore: number;
+    sacralScore: number;
+    solarPlexusScore: number;
+    heartScore: number;
+    throatScore: number;
+    thirdEyeScore: number;
+    crownScore: number;
+    rubricVersion: string;
+    computedAt: Date;
+    recalcTrigger: string;
+  } | null;
+  history: Array<{
+    id: string;
+    versionNumber: number;
+    totalScore: number;
+    tier: SeedScoreTier;
+    recalcTrigger: string;
+    computedAt: Date;
+    rubricVersion: string;
+  }>;
+  scoreRecalcRequired: boolean;
+  canView: boolean;
+  canRecalc: boolean;
+}) {
+  if (!canView) {
+    return (
+      <p className="text-sm text-stone-600">
+        You do not have permission to view SeedScore.
+      </p>
+    );
+  }
+
+  const effectiveTier = tier ?? "UNSCORED";
+  const chakraVals = score
+    ? {
+        ROOT: score.rootScore,
+        SACRAL: score.sacralScore,
+        SOLAR_PLEXUS: score.solarPlexusScore,
+        HEART: score.heartScore,
+        THROAT: score.throatScore,
+        THIRD_EYE: score.thirdEyeScore,
+        CROWN: score.crownScore,
+      }
+    : null;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">SeedScore</h2>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span
+              className={cn(
+                "rounded-md px-2 py-0.5 text-xs font-medium",
+                tierBadgeClass(effectiveTier),
+              )}
+            >
+              {TIER_LABEL[effectiveTier]}
+            </span>
+            {score && (
+              <span className="text-sm font-medium text-stone-900">
+                {score.totalScore} / 100
+              </span>
+            )}
+            {scoreRecalcRequired && (
+              <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs text-amber-900">
+                Recalc required (rubric / schedule)
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {canRecalc && (
+            <>
+              <Link href={`/admin/donors/${donorId}/seedscore/answer`}>
+                <Button>Enter Answers</Button>
+              </Link>
+              <Link href={`/admin/donors/${donorId}/seedscore/answer`}>
+                <Button variant="outline">Recalculate Score</Button>
+              </Link>
+            </>
+          )}
+          <Link href={`/admin/donors/${donorId}/override-seedscore-gate`}>
+            <Button variant="outline">Gate override</Button>
+          </Link>
+        </div>
+      </div>
+
+      {!score && (
+        <p className="rounded-md bg-stone-50 p-4 text-sm text-stone-700">
+          This donor has not yet been scored. Enter answers to generate the
+          first SeedScore.
+        </p>
+      )}
+
+      {score && chakraVals && (
+        <div>
+          <h3 className="mb-2 text-sm font-medium text-stone-700">
+            Chakra breakdown · rubric {score.rubricVersion}
+          </h3>
+          <ul className="space-y-2">
+            {CHAKRA_ORDER.map((c) => {
+              const val = chakraVals[c];
+              const max = CHAKRA_WEIGHTS[c];
+              const pct = max > 0 ? (val / max) * 100 : 0;
+              return (
+                <li key={c} className="text-sm">
+                  <div className="mb-1 flex justify-between">
+                    <span>{CHAKRA_LABEL[c]}</span>
+                    <span className="font-medium">
+                      {val}/{max}
+                    </span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-stone-100">
+                    <div
+                      className="h-full rounded-full bg-emerald-700"
+                      style={{ width: `${Math.min(100, pct)}%` }}
+                    />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="mt-3 text-xs text-stone-500">
+            Computed {score.computedAt.toISOString().slice(0, 10)} · trigger{" "}
+            {score.recalcTrigger}
+          </p>
+        </div>
+      )}
+
+      <div>
+        <h3 className="mb-2 text-sm font-medium text-stone-700">
+          Score history
+        </h3>
+        {history.length === 0 ? (
+          <p className="text-sm text-stone-500">No prior scores.</p>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {history.map((h) => (
+              <li
+                key={h.id}
+                className="flex flex-wrap justify-between gap-2 rounded-md border border-stone-100 px-3 py-2"
+              >
+                <span>
+                  v{h.versionNumber} · {h.totalScore} · {TIER_LABEL[h.tier]} ·{" "}
+                  {h.recalcTrigger}
+                </span>
+                <span className="text-xs text-stone-500">
+                  {h.computedAt.toISOString().slice(0, 10)} · {h.rubricVersion}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

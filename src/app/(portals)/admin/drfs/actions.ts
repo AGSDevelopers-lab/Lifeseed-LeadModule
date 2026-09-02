@@ -26,7 +26,13 @@ import { logAttestation } from "@/lib/witness";
 
 export type ActionResult =
   | { ok: true; id?: string }
-  | { ok: false; error: string };
+  | {
+      ok: false;
+      error: string;
+      code?: "TIER_MISMATCH";
+      warn?: boolean;
+      details?: string;
+    };
 
 function catchPerm(err: unknown): ActionResult {
   if (err instanceof Response) {
@@ -145,6 +151,8 @@ const allocateSchema = z.object({
   drfId: z.string().min(1),
   vialIds: z.array(z.string()).min(1),
   witnessUserId: z.string().min(1),
+  /** BRM confirmed atypical tier↔package pairing when SEEDSCORE_GATE_ENABLED. */
+  confirmTierMismatch: z.boolean().optional(),
 });
 
 export async function allocateVials(
@@ -176,9 +184,55 @@ export async function allocateVials(
         isDispensed: false,
         isReleased: true,
       },
+      include: {
+        sample: {
+          include: {
+            donor: { select: { id: true, donorCode: true, currentTier: true } },
+          },
+        },
+      },
     });
     if (vials.length !== d.vialIds.length) {
       return { ok: false, error: "One or more vials unavailable" };
+    }
+
+    // SeedScore tier ↔ package eligibility (warn, not block) when gate enabled
+    if (process.env.SEEDSCORE_GATE_ENABLED === "true") {
+      const { isPackageEligibleForTier } = await import(
+        "@/lib/seedscore/calculator"
+      );
+      const { TIER_LABEL } = await import("@/lib/seedscore/constants");
+      const mismatches: string[] = [];
+      for (const v of vials) {
+        const tier = v.sample.donor.currentTier ?? "UNSCORED";
+        if (!isPackageEligibleForTier(tier, drf.packageTier)) {
+          mismatches.push(
+            `${v.sample.donor.donorCode} (${TIER_LABEL[tier]}) ≠ package ${drf.packageTier}`,
+          );
+        }
+      }
+      if (mismatches.length > 0 && !d.confirmTierMismatch) {
+        return {
+          ok: false,
+          code: "TIER_MISMATCH",
+          warn: true,
+          error: `Selected donor tier is not typical for package ${drf.packageTier}. Continue anyway?`,
+          details: mismatches.join("; "),
+        };
+      }
+      if (mismatches.length > 0 && d.confirmTierMismatch) {
+        await audit.log({
+          actorUserId: session.userId,
+          action: "seedscore.package.override",
+          entityType: "DRF",
+          entityId: drf.id,
+          afterJson: {
+            packageTier: drf.packageTier,
+            mismatches,
+            witnessUserId: d.witnessUserId,
+          },
+        });
+      }
     }
 
     const dispatchNumber = await nextDispatchNumber(drf.site.code);

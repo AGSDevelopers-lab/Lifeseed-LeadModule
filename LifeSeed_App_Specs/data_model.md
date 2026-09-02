@@ -134,7 +134,30 @@ model UserRoleAssignment {
 // ===== DONOR =====
 
 enum DonorType { SEMEN OOCYTE }
-enum DonorStatus { PROSPECT ACTIVE DEFERRED REJECTED WITHDRAWN RETIRED SUSPENDED }
+enum DonorStatus { PROSPECT ELIGIBLE ACTIVE DEFERRED REJECTED WITHDRAWN RETIRED SUSPENDED }
+
+enum DonorPhase {
+  P0_INTAKE
+  P1_SCREENING
+  P2_ACTIVE
+  P3_DRF
+  P4_OUTCOME
+}
+
+enum RejectionCode {
+  REG_AGE
+  REG_MAR
+  REG_CHILD
+  OPS_KYC
+  OPS_DUP
+  OPS_GEO
+  WDR_VOL
+  MED_INF
+  MED_PHY
+  GEN_HX
+  SEROLOGY_POSITIVE
+}
+
 enum SampleType { REGULAR QUARANTINE }
 enum SamplePriority { REGULAR URGENT }
 
@@ -166,11 +189,14 @@ model Donor {
 
   // Status + tracking
   status          DonorStatus   @default(PROSPECT)
-  rejectionCode   String?       // MED-INF, GEN-KAR, PSY-FAIL, REG-AGE, etc.
+  phase           DonorPhase    @default(P0_INTAKE)
+  rejectionCode   RejectionCode?
   passportIssuedAt DateTime?    // Donor Passport (post-eligibility)
   registryEntryId String?       // ART Act national registry ID
   cumulativePregnancies Int @default(0)  // ART Act §29 tracking
   bankPolicyCap   Int?          // e.g., 5 pregnancies
+  deferredUntil   DateTime?
+  outcomeNotes    String?
 
   // Screening
   bloodGroup      String?

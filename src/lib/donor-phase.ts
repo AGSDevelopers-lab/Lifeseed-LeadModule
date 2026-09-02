@@ -3,6 +3,7 @@ import {
   DonorStatus,
   type Donor,
   type RejectionCode,
+  type SeedScoreTier,
 } from "@prisma/client";
 
 import { audit } from "@/lib/audit";
@@ -70,28 +71,69 @@ function phaseIndex(phase: DonorPhase): number {
 /**
  * Guard: whether a donor may move to targetPhase.
  * Forward-only along P0→P4 unless already at/after target.
+ * When SEEDSCORE_GATE_ENABLED=true, P1→P2 blocks NOT_RECOMMENDED (unless bypass).
  */
 export function canAdvance(
-  donor: Pick<Donor, "phase" | "status">,
+  donor: Pick<Donor, "phase" | "status"> & {
+    currentTier?: SeedScoreTier | null;
+  },
   targetPhase: DonorPhase,
+  opts?: { bypassSeedScoreGate?: boolean },
 ): boolean {
-  if (TERMINAL_STATUSES.includes(donor.status)) return false;
-  if (donor.status === DonorStatus.DEFERRED) return false;
+  return canAdvanceDetailed(donor, targetPhase, opts).canAdvance;
+}
+
+export function canAdvanceDetailed(
+  donor: Pick<Donor, "phase" | "status"> & {
+    currentTier?: SeedScoreTier | null;
+  },
+  targetPhase: DonorPhase,
+  opts?: { bypassSeedScoreGate?: boolean },
+): { canAdvance: boolean; reason?: string } {
+  if (TERMINAL_STATUSES.includes(donor.status)) {
+    return { canAdvance: false, reason: "Donor is in a terminal status" };
+  }
+  if (donor.status === DonorStatus.DEFERRED) {
+    return { canAdvance: false, reason: "Donor is deferred" };
+  }
 
   const from = phaseIndex(donor.phase);
   const to = phaseIndex(targetPhase);
-  if (to < 0 || from < 0) return false;
-  // Allow same phase (idempotent) or exactly +1 step; multi-step only P1→P2 via screening
-  if (to === from) return true;
-  if (to === from + 1) return true;
-  // Screening completion may jump P1 → P2
-  if (
+  if (to < 0 || from < 0) {
+    return { canAdvance: false, reason: "Unknown phase" };
+  }
+
+  let phaseOk = false;
+  if (to === from) phaseOk = true;
+  else if (to === from + 1) phaseOk = true;
+  else if (
     donor.phase === DonorPhase.P1_SCREENING &&
     targetPhase === DonorPhase.P2_ACTIVE
   ) {
-    return true;
+    phaseOk = true;
   }
-  return false;
+  if (!phaseOk) {
+    return {
+      canAdvance: false,
+      reason: `Illegal phase transition: ${donor.phase} → ${targetPhase}`,
+    };
+  }
+
+  if (
+    process.env.SEEDSCORE_GATE_ENABLED === "true" &&
+    donor.phase === DonorPhase.P1_SCREENING &&
+    targetPhase === DonorPhase.P2_ACTIVE &&
+    donor.currentTier === "NOT_RECOMMENDED" &&
+    !opts?.bypassSeedScoreGate
+  ) {
+    return {
+      canAdvance: false,
+      reason:
+        "Donor has SeedScore tier Not Recommended (<55). BRM review required before P2 activation. Override via /admin/donors/[id]/override-seedscore-gate with permission seedscore.override.tier.",
+    };
+  }
+
+  return { canAdvance: true };
 }
 
 export type AdvancePhaseContext = {
@@ -102,6 +144,8 @@ export type AdvancePhaseContext = {
   rejectionCode?: RejectionCode | null;
   deferredUntil?: Date | null;
   outcomeNotes?: string | null;
+  /** When true + actor has seedscore.override.tier, skip NOT_RECOMMENDED P1→P2 gate. */
+  bypassSeedScoreGate?: boolean;
 };
 
 /**
@@ -114,9 +158,13 @@ export async function advancePhase(
 ): Promise<Donor> {
   const donor = await prisma.donor.findUniqueOrThrow({ where: { id: donorId } });
 
-  if (!canAdvance(donor, targetPhase)) {
+  const gate = canAdvanceDetailed(donor, targetPhase, {
+    bypassSeedScoreGate: actor.bypassSeedScoreGate,
+  });
+  if (!gate.canAdvance) {
     throw new Error(
-      `Illegal phase transition: ${donor.phase} → ${targetPhase} (status=${donor.status})`,
+      gate.reason ??
+        `Illegal phase transition: ${donor.phase} → ${targetPhase} (status=${donor.status})`,
     );
   }
 

@@ -42,6 +42,7 @@ export function AllocateForm({
   const [selected, setSelected] = useState<string[]>([]);
   const [witnessUserId, setWitnessUserId] = useState(witnesses[0]?.id ?? "");
   const [loading, setLoading] = useState(false);
+  const [confirmTierMismatch, setConfirmTierMismatch] = useState(false);
 
   const sorted = useMemo(() => {
     // URGENT DRFs: show all, but surface URGENT-sample vials first
@@ -76,8 +77,33 @@ export function AllocateForm({
         drfId,
         vialIds: selected,
         witnessUserId,
+        confirmTierMismatch,
       });
       if (!result.ok) {
+        if (result.code === "TIER_MISMATCH" && result.warn) {
+          const proceed = window.confirm(
+            `${result.error}\n\n${result.details ?? ""}\n\nContinue anyway?`,
+          );
+          if (proceed) {
+            setConfirmTierMismatch(true);
+            const retry = await allocateVials({
+              drfId,
+              vialIds: selected,
+              witnessUserId,
+              confirmTierMismatch: true,
+            });
+            if (!retry.ok) {
+              toast.error(retry.error);
+              return;
+            }
+            toast.success("Vials allocated (tier override logged)");
+            router.push(`/admin/drfs/${drfId}`);
+            router.refresh();
+            return;
+          }
+          toast.message("Allocation cancelled");
+          return;
+        }
         toast.error(result.error);
         return;
       }

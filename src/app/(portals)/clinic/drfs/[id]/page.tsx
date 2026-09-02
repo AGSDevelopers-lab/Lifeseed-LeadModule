@@ -8,6 +8,15 @@ import {
   permissionGranted,
   permissionsForRoles,
 } from "@/lib/rbac";
+import {
+  CHAKRA_LABEL,
+  CHAKRA_ORDER,
+  TIER_LABEL,
+} from "@/lib/seedscore/constants";
+import {
+  getSeedScoreVisibility,
+  tierBadgeClass,
+} from "@/lib/seedscore/visibility";
 import { cn } from "@/lib/utils";
 
 type Params = Promise<{ id: string }>;
@@ -42,6 +51,17 @@ export default async function ClinicDrfDetailPage({
     include: { site: true, clinic: true },
   });
   if (!drf) notFound();
+
+  const allocatedDonor = drf.allocatedDonorId
+    ? await prisma.donor.findUnique({
+        where: { id: drf.allocatedDonorId },
+        include: { seedScore: true },
+      })
+    : null;
+
+  const seedVis = getSeedScoreVisibility(session.roles, {
+    clinicOwnsDrf: true,
+  });
 
   const events = await prisma.auditLog.findMany({
     where: { entityType: "DRF", entityId: drf.id },
@@ -86,6 +106,48 @@ export default async function ClinicDrfDetailPage({
           </li>
         ))}
       </ol>
+
+      {allocatedDonor && seedVis.showTier && (
+        <div className="rounded-xl border border-stone-200 bg-white p-4">
+          <h2 className="text-sm font-semibold text-stone-900">
+            Allocated donor SeedScore
+          </h2>
+          <p className="mt-1 text-sm text-stone-600">
+            {allocatedDonor.donorCode}
+            {seedVis.showNumeric && allocatedDonor.seedScore
+              ? ` · ${allocatedDonor.seedScore.totalScore}/100`
+              : ""}
+          </p>
+          <span
+            className={cn(
+              "mt-2 inline-block rounded-md px-2 py-0.5 text-xs font-medium",
+              tierBadgeClass(allocatedDonor.currentTier),
+            )}
+          >
+            {TIER_LABEL[allocatedDonor.currentTier ?? "UNSCORED"]}
+          </span>
+          {seedVis.showBreakdown && allocatedDonor.seedScore && (
+            <ul className="mt-3 grid grid-cols-2 gap-1 text-xs text-stone-700 sm:grid-cols-4">
+              {CHAKRA_ORDER.map((c) => {
+                const map = {
+                  ROOT: allocatedDonor.seedScore!.rootScore,
+                  SACRAL: allocatedDonor.seedScore!.sacralScore,
+                  SOLAR_PLEXUS: allocatedDonor.seedScore!.solarPlexusScore,
+                  HEART: allocatedDonor.seedScore!.heartScore,
+                  THROAT: allocatedDonor.seedScore!.throatScore,
+                  THIRD_EYE: allocatedDonor.seedScore!.thirdEyeScore,
+                  CROWN: allocatedDonor.seedScore!.crownScore,
+                };
+                return (
+                  <li key={c}>
+                    {CHAKRA_LABEL[c]}: {map[c]}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
 
       <ul className="space-y-1 rounded-xl border border-stone-200 bg-white p-4 text-xs text-stone-600">
         {events.map((e) => (

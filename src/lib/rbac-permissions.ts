@@ -38,6 +38,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "cycle.log_event",
     "cohort.view",
     "cohort.edit_disposition",
+    "seedscore.view",
   ],
   CLINIC_COORDINATOR: [
     "recipient.create",
@@ -53,6 +54,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "cycle.log_event",
     "cohort.view",
     "cohort.edit_disposition",
+    "seedscore.view",
   ],
   CLINIC_NURSE: [
     "dispatch.receive",
@@ -162,6 +164,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "drf.cancel",
     "dispatch.list",
     "dispatch.view",
+    "seedscore.view",
   ],
   BANK_WITNESS: [
     "witness.attest.any",
@@ -328,6 +331,18 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "drf.view",
     "donor.list",
     "donor.view",
+    "seedscore.view",
+    "seedscore.override.tier",
+  ],
+  BANK_BRM: [
+    "donor.list",
+    "donor.view",
+    "donor.read",
+    "seedscore.view",
+    "seedscore.recalc.manual",
+    "seedscore.rubric.author",
+    "seedscore.question.author",
+    "seedscore.rubric.publish",
   ],
   BANK_SUPER_ADMIN: [
     "donor.*",
@@ -394,6 +409,12 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "cycle.log_event",
     "cohort.view",
     "cohort.edit_disposition",
+    "seedscore.view",
+    "seedscore.recalc.manual",
+    "seedscore.rubric.author",
+    "seedscore.rubric.publish",
+    "seedscore.question.author",
+    "seedscore.override.tier",
   ],
   L2_IVF_CLINICIAN: [
     "cycle_event.log",

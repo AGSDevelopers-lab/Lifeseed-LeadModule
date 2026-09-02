@@ -78,6 +78,7 @@ const NAV: Record<PortalKind, NavItem[]> = {
       children: [
         { href: "/admin/config/qc-gates", label: "QC Gates" },
         { href: "/admin/config/categories", label: "Categories" },
+        { href: "/admin/config/seedscore", label: "SeedScore Rubric" },
       ],
     },
   ],

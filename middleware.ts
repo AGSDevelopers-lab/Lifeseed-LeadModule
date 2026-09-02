@@ -9,6 +9,7 @@ const PUBLIC_PREFIXES = [
   "/api/health",
   "/api/webhooks",
   "/api/embryology/nudges",
+  "/api/seedscore/recalc-scheduled",
 ];
 
 const PROTECTED_PREFIXES = [
