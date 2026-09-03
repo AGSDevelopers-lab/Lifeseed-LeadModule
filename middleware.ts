@@ -15,6 +15,7 @@ const PUBLIC_PREFIXES = [
   "/api/leads/sla/run",
   "/api/leads/crm-sync/run",
   "/api/leads/purge-expired",
+  "/api/reports/scheduled/run",
 ];
 
 const PROTECTED_PREFIXES = [

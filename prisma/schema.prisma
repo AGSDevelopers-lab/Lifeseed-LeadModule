@@ -108,6 +108,12 @@ model User {
   counsellingSessions CounsellingBooking[] @relation("CounsellingCounsellor")
   dncEntries LeadDoNotCallList[] @relation("DncAddedBy")
 
+  reportSchedulesCreated ReportSchedule[] @relation("ReportScheduleCreator")
+  reportRuns             ReportRun[]      @relation("ReportRunActor")
+  reportFavorites        ReportFavorite[]
+  reportSnapshots        ReportSnapshot[] @relation("ReportSnapshotCapture")
+  reportDeliveries       ReportDeliveryLog[]
+
   createdAt   DateTime  @default(now())
   lastLoginAt DateTime?
 }
@@ -1690,4 +1696,143 @@ model LeadDoNotCallList {
   source      DncSource @default(OPS_ADD)
 
   @@index([email])
+}
+
+// ===== REPORTS MODULE (v1 · additive-only · read-only across platform) =====
+
+enum ReportCategory {
+  CLINICAL
+  FINANCE
+  LOGISTICS
+  COMPLIANCE
+  REGULATORY
+  OPERATIONAL
+}
+
+enum ReportCadence {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  ANNUALLY
+  CUSTOM
+  ON_DEMAND
+}
+
+enum ReportExportFormat {
+  CSV
+  XLSX
+  PDF
+  JSON
+}
+
+enum ReportDeliveryChannel {
+  EMAIL
+  WHATSAPP
+  DOWNLOAD_LINK
+}
+
+enum ReportTriggeredBy {
+  MANUAL
+  SCHEDULED
+  API
+}
+
+model ReportSchedule {
+  id                   String                @id @default(cuid())
+  reportId             String
+  cadence              ReportCadence
+  filterValues         Json
+  exportFormat         ReportExportFormat
+  subscriberUserIds    String[]
+  deliveryChannel      ReportDeliveryChannel @default(EMAIL)
+  isActive             Boolean               @default(true)
+  createdByUserId      String
+  createdBy            User                  @relation("ReportScheduleCreator", fields: [createdByUserId], references: [id])
+  nextRunAt            DateTime?
+  lastRunAt            DateTime?
+  /// Frequency detail: IST hour/minute, day of week/month, quarter month, cron.
+  scheduleDetail       Json?
+  dataWindowPreset     String?
+  dataWindowCustomFrom DateTime?
+  dataWindowCustomTo   DateTime?
+  comparePreset        String?
+  compareCustomFrom    DateTime?
+  compareCustomTo      DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  runs ReportRun[]
+
+  @@index([reportId])
+  @@index([nextRunAt, isActive])
+  @@index([createdByUserId])
+}
+
+model ReportRun {
+  id             String              @id @default(cuid())
+  reportId       String
+  runByUserId    String?
+  runBy          User?               @relation("ReportRunActor", fields: [runByUserId], references: [id])
+  triggeredBy    ReportTriggeredBy
+  startedAt      DateTime            @default(now())
+  completedAt    DateTime?
+  rowCount       Int?
+  exportFormat   ReportExportFormat?
+  exportUrl      String?
+  errorMessage   String?
+  filterSnapshot Json
+  scheduleId     String?
+  schedule       ReportSchedule?     @relation(fields: [scheduleId], references: [id])
+
+  deliveries ReportDeliveryLog[]
+
+  @@index([reportId])
+  @@index([startedAt])
+  @@index([scheduleId])
+}
+
+model ReportDeliveryLog {
+  id               String                @id @default(cuid())
+  reportRunId      String
+  reportRun        ReportRun             @relation(fields: [reportRunId], references: [id], onDelete: Cascade)
+  subscriberUserId String
+  subscriber       User                  @relation(fields: [subscriberUserId], references: [id])
+  channel          ReportDeliveryChannel
+  attemptedAt      DateTime              @default(now())
+  succeeded        Boolean               @default(false)
+  errorMessage     String?
+
+  @@index([reportRunId])
+  @@index([subscriberUserId])
+}
+
+model ReportSnapshot {
+  id                String   @id @default(cuid())
+  reportId          String
+  snapshotName      String
+  capturedAt        DateTime @default(now())
+  capturedByUserId  String
+  capturedBy        User     @relation("ReportSnapshotCapture", fields: [capturedByUserId], references: [id])
+  dataUrl           String
+  filterSnapshot    Json
+  isImmutable       Boolean  @default(true)
+  retentionExpiresAt DateTime?
+  notes             String?
+
+  @@index([reportId])
+  @@index([capturedAt])
+}
+
+model ReportFavorite {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reportId     String
+  savedFilters Json?
+  displayName  String
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, reportId, displayName])
+  @@index([userId])
 }

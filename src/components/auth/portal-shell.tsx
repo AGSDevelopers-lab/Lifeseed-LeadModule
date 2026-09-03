@@ -13,6 +13,7 @@ import {
   LogOut,
   Microscope,
   PieChart,
+  Pin,
   Receipt,
   Repeat,
   Settings2,
@@ -46,7 +47,8 @@ type NavIconKind =
   | "cohorts"
   | "outcomes"
   | "leads"
-  | "headset";
+  | "headset"
+  | "reports";
 
 type NavItem = {
   href: string;
@@ -84,6 +86,20 @@ const NAV: Record<PortalKind, NavItem[]> = {
       icon: "finance",
     },
     { href: "/admin/outcomes", label: "Outcomes", icon: "outcomes" },
+    {
+      href: "/admin/reports",
+      label: "Reports",
+      icon: "reports",
+      children: [
+        { href: "/admin/reports", label: "Dashboard" },
+        { href: "/admin/reports/clinical", label: "Clinical" },
+        { href: "/admin/reports/finance", label: "Finance" },
+        { href: "/admin/reports/logistics", label: "Logistics" },
+        { href: "/admin/reports/compliance", label: "Compliance" },
+        { href: "/admin/reports/favorites", label: "My Favorites" },
+        { href: "/admin/reports/schedules", label: "Schedules" },
+      ],
+    },
     {
       href: "/admin/config",
       label: "Config",
@@ -134,6 +150,7 @@ function NavIcon({ kind }: { kind?: NavIconKind }) {
   if (kind === "outcomes") return <Activity className={className} />;
   if (kind === "leads") return <Headset className={className} />;
   if (kind === "headset") return <Headset className={className} />;
+  if (kind === "reports") return <Pin className={className} />;
   return <LayoutDashboard className={className} />;
 }
 
