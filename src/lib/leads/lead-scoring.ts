@@ -39,6 +39,11 @@ const SOURCE_POINTS: Record<LeadSource, number> = {
   SOCIAL_GOOGLE_ADS: 5,
   PARTNER_HOSPITAL: 15,
   OTHER: 2,
+  HOSPITAL_REFERRAL: 2,
+  PARTNER: 2,
+  CAMPAIGN: 2,
+  API: 2,
+  MANUAL: 2,
 };
 
 const SERVICE_AREAS = new Set([

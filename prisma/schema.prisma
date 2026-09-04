@@ -39,6 +39,7 @@ model Site {
   invoices   Invoice[]
   qcGateConfigs       QcGateConfig[]
   categoryRuleConfigs CategoryRuleConfig[]
+  leadAssignments     LeadAssignment[]
 }
 
 // ===== USERS + RBAC =====
@@ -104,9 +105,29 @@ model User {
   rubricVersionsPublished RubricVersion[] @relation("RubricVersionPublisher")
 
   assignedLeads Lead[] @relation("LeadTelecaller")
+  archivedLeads Lead[] @relation("LeadArchivedBy")
   callDispositions CallDisposition[] @relation("CallDispositionTelecaller")
   counsellingSessions CounsellingBooking[] @relation("CounsellingCounsellor")
+  cancelledBookings CounsellingBooking[] @relation("CounsellingCancelledBy")
   dncEntries LeadDoNotCallList[] @relation("DncAddedBy")
+  leadActivities LeadActivity[] @relation("LeadActivityActor")
+  leadStatusHistories LeadStatusHistory[] @relation("LeadStatusHistoryActor")
+  leadScoresComputed LeadScore[] @relation("LeadScoreComputedBy")
+  leadAssignmentsReceived LeadAssignment[] @relation("LeadAssignmentAssignee")
+  leadAssignmentsMade LeadAssignment[] @relation("LeadAssignmentAssigner")
+  leadFollowUpsOwned LeadFollowUp[] @relation("LeadFollowUpOwner")
+  leadFollowUpsCompleted LeadFollowUp[] @relation("LeadFollowUpCompletedBy")
+  counsellingSessionLogs CounsellingSession[] @relation("CounsellingSessionCounsellor")
+  counsellingSessionsRecorded CounsellingSession[] @relation("CounsellingSessionRecorder")
+  counsellingOutcomes CounsellingOutcome[] @relation("CounsellingOutcomeRecommender")
+  campaignsOwned Campaign[] @relation("CampaignOwner")
+  duplicateCasesReviewed DuplicateCase[] @relation("DuplicateCaseReviewer")
+  leadMergesDecided LeadMerge[] @relation("LeadMergeDecidedBy")
+  leadConversionsDecided LeadConversion[] @relation("LeadConversionDecidedBy")
+  leadConfigsCreated LeadConfig[] @relation("LeadConfigAuthor")
+  leadConfigsApproved LeadConfig[] @relation("LeadConfigApprover")
+  notificationTemplatesApproved NotificationTemplate[] @relation("NotificationTemplateApprover")
+  outboxDlqResolved LeadOutboxDlq[] @relation("OutboxDlqResolver")
 
   reportSchedulesCreated ReportSchedule[] @relation("ReportScheduleCreator")
   reportRuns             ReportRun[]      @relation("ReportRunActor")
@@ -1440,6 +1461,11 @@ enum LeadSource {
   CLINIC_REFERRAL
   PARTNER_HOSPITAL
   OTHER
+  HOSPITAL_REFERRAL
+  PARTNER
+  CAMPAIGN
+  API
+  MANUAL
 }
 
 enum LeadTier {
@@ -1515,6 +1541,7 @@ enum CrmSyncStatus {
   FAILED
   RETRYING
   SKIPPED
+  DEAD
 }
 
 enum CrmEntityType {
@@ -1532,6 +1559,245 @@ enum DncSource {
   SELF_REQUEST
   OPS_ADD
   COMPLIANCE_ADD
+  LEAD_REQUEST
+  REGULATOR
+  SYSTEM
+  UNSUBSCRIBE_LINK
+  MANUAL
+}
+
+enum LeadLanguage {
+  ENGLISH
+  HINDI
+  BENGALI
+  TELUGU
+  OTHER
+}
+
+enum LeadOutcome {
+  WON
+  LOST
+  EXPIRED
+  MERGED
+}
+
+enum LeadActivityType {
+  CALL
+  WHATSAPP
+  SMS
+  EMAIL
+  NOTE
+  FOLLOW_UP
+  COUNSELLING
+  APPOINTMENT
+  STATUS_CHANGE
+  ASSIGNMENT
+  ESCALATION
+  CONVERSION
+  MERGE
+  DNC
+  SYSTEM
+}
+
+enum LeadChannel {
+  INBOUND
+  OUTBOUND
+  SYSTEM
+}
+
+enum LeadEvent {
+  intake
+  assign
+  reassign
+  claim
+  disposition_qualified
+  disposition_not_interested
+  disposition_callback
+  disposition_not_reachable
+  disposition_wrong_number
+  disposition_do_not_call
+  book_counselling
+  session_attended
+  session_no_show
+  session_cancelled
+  convert_donor
+  convert_recipient
+  archive
+  unarchive
+  reactivate
+  expire_by_retention
+  merge_loser
+}
+
+enum AssignmentType {
+  AUTO_ROUND_ROBIN
+  MANUAL
+  REASSIGN
+  CLAIM
+  ESCALATION
+}
+
+enum FollowUpType {
+  CALLBACK
+  RECONTACT
+  COUNSELLING_REMINDER
+  DOC_REQUEST
+  CUSTOM
+}
+
+enum FollowUpPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum FollowUpStatus {
+  OPEN
+  DUE
+  OVERDUE
+  COMPLETED
+  CANCELLED
+  RESCHEDULED
+}
+
+enum BookingStatus {
+  SCHEDULED
+  RESCHEDULED
+  CANCELLED
+  CLOSED
+}
+
+enum SessionAttendance {
+  ATTENDED
+  NO_SHOW
+  CANCELLED_BY_CLINIC
+  CANCELLED_BY_LEAD
+}
+
+enum CounsellingRecommendation {
+  RECOMMEND_REGISTER
+  DEFER
+  DECLINE
+  REFER_OUT
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+enum TouchType {
+  FIRST
+  SUBSEQUENT
+}
+
+enum MatchLevel {
+  EXACT
+  PROBABLE
+  POSSIBLE
+}
+
+enum DupReviewStatus {
+  OPEN
+  UNDER_REVIEW
+  MERGED
+  KEPT_SEPARATE
+  DISMISSED
+}
+
+enum MergeCopyStrategy {
+  COPY_ALL
+  COPY_MEANINGFUL
+  REFERENCE_ONLY
+}
+
+enum DncChannel {
+  PHONE
+  EMAIL
+  WHATSAPP
+  SMS
+  ALL
+}
+
+enum ConversionTarget {
+  DONOR
+  RECIPIENT
+}
+
+enum LeadEventType {
+  LeadCreated
+  LeadAssigned
+  LeadContacted
+  LeadQualified
+  LeadFollowUpCreated
+  LeadFollowUpCompleted
+  CounsellingBooked
+  CounsellingAttended
+  CounsellingNoShow
+  LeadLost
+  LeadConverted
+  LeadMerged
+  LeadDncAdded
+  LeadScoreChanged
+  LeadArchived
+  LeadReactivated
+}
+
+enum DispatchStatus {
+  PENDING
+  IN_FLIGHT
+  PUBLISHED
+  FAILED
+  DEAD
+}
+
+enum DlqResolution {
+  REPUBLISH
+  DISCARD
+  MANUAL_FIX
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  WHATSAPP
+  IN_APP
+}
+
+enum NotificationProvider {
+  RESEND
+  SMS_MAGIC
+  META_WHATSAPP
+  IN_APP
+}
+
+enum DeliveryStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  BOUNCED
+  READ
+  REPLIED
+  BLOCKED_DNC
+}
+
+enum CrmOperation {
+  UPSERT_LEAD
+  UPDATE_STATUS
+  LOG_ACTIVITY
+  CLOSE_LEAD
+  CONVERT
+}
+
+enum ScoreTrigger {
+  intake
+  manual_rescore
+  config_version_change
+  activity_signal
 }
 
 model Lead {
@@ -1582,10 +1848,49 @@ model Lead {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  callDispositions    CallDisposition[]
-  counsellingBooking  CounsellingBooking?
-  convertedDonor      Donor?     @relation("LeadConvertedDonor")
-  convertedRecipient  Recipient? @relation("LeadConvertedRecipient")
+  /// v2.1 additive (B01) — no renames / drops
+  outcome              LeadOutcome?
+  isArchived           Boolean      @default(false)
+  archivedAt           DateTime?
+  archivedByUserId     String?
+  archivedBy           User?        @relation("LeadArchivedBy", fields: [archivedByUserId], references: [id])
+  archiveReason        String?
+  campaignId           String?
+  campaign             Campaign?    @relation(fields: [campaignId], references: [id])
+  latestScoreId        String?      @unique
+  latestScore          LeadScore?   @relation("LeadLatestScore", fields: [latestScoreId], references: [id])
+  latestScoreValue     Int?
+  activeAssignmentId   String?      @unique
+  activeAssignment     LeadAssignment? @relation("LeadActiveAssignment", fields: [activeAssignmentId], references: [id])
+  mergedIntoLeadId     String?
+  mergedInto           Lead?        @relation("LeadMergedInto", fields: [mergedIntoLeadId], references: [id])
+  mergeLosers          Lead[]       @relation("LeadMergedInto")
+  duplicateOfLeadId    String?
+  duplicateOf          Lead?        @relation("LeadDuplicateOf", fields: [duplicateOfLeadId], references: [id])
+  duplicateMarkers     Lead[]       @relation("LeadDuplicateOf")
+  redactedAt           DateTime?
+  redactionReason      String?
+  version              Int          @default(1)
+
+  callDispositions     CallDisposition[]
+  counsellingBooking   CounsellingBooking?
+  counsellingSessions  CounsellingSession[]
+  counsellingOutcomes  CounsellingOutcome[]
+  convertedDonor       Donor?     @relation("LeadConvertedDonor")
+  convertedRecipient   Recipient? @relation("LeadConvertedRecipient")
+  activities           LeadActivity[]
+  statusHistory        LeadStatusHistory[]
+  scores               LeadScore[]          @relation("LeadScoreHistory")
+  assignments          LeadAssignment[]     @relation("LeadAssignmentHistory")
+  followUps            LeadFollowUp[]
+  attribution          LeadAttribution?
+  attributionHistory   LeadAttributionHistory[]
+  duplicateCasesLeft   DuplicateCase[]      @relation("DuplicateCaseLeft")
+  duplicateCasesRight  DuplicateCase[]      @relation("DuplicateCaseRight")
+  mergesAsWinner       LeadMerge[]          @relation("LeadMergeWinner")
+  mergesAsLoser        LeadMerge[]          @relation("LeadMergeLoser")
+  conversionRecord     LeadConversion?
+  notificationLogs     NotificationDeliveryLog[]
 
   @@index([status])
   @@index([tier])
@@ -1593,6 +1898,11 @@ model Lead {
   @@index([assignedTelecallerId])
   @@index([retentionExpiresAt])
   @@index([phone])
+  @@index([email])
+  @@index([isArchived])
+  @@index([campaignId, capturedAt])
+  @@index([assignedTelecallerId, status])
+  @@index([mergedIntoLeadId])
 }
 
 model CallDisposition {
@@ -1612,6 +1922,11 @@ model CallDisposition {
   qaSampledAt     DateTime?
   recordingUrl    String?
   createdAt       DateTime             @default(now())
+
+  activityId      String?
+  activity        LeadActivity?        @relation(fields: [activityId], references: [id])
+  followUpId      String?
+  followUp        LeadFollowUp?        @relation(fields: [followUpId], references: [id])
 
   @@index([leadId])
   @@index([telecallerId])
@@ -1638,8 +1953,17 @@ model CounsellingBooking {
   createdAt       DateTime                 @default(now())
   updatedAt       DateTime                 @updatedAt
 
+  bookingStatus            BookingStatus @default(SCHEDULED)
+  rescheduledFromBookingId String?
+  rescheduledFrom          CounsellingBooking?  @relation("BookingReschedule", fields: [rescheduledFromBookingId], references: [id])
+  rescheduledTo            CounsellingBooking[] @relation("BookingReschedule")
+  cancelledByUserId        String?
+  cancelledBy              User?         @relation("CounsellingCancelledBy", fields: [cancelledByUserId], references: [id])
+  sessions                 CounsellingSession[]
+
   @@index([counsellorUserId, scheduledAt])
   @@index([status])
+  @@index([bookingStatus])
 }
 
 model SlaSchedule {
@@ -1660,6 +1984,7 @@ model SlaSchedule {
   escalationLadder     Json?
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
+  leadFollowUps        LeadFollowUp[]
 
   @@index([status, responseDueAt])
   @@index([entityType, entityId])
@@ -1680,6 +2005,13 @@ model CrmSyncQueue {
   succeededAt   DateTime?
   createdAt     DateTime      @default(now())
 
+  outboxEventId    String?
+  outboxEvent      LeadOutboxEvent? @relation(fields: [outboxEventId], references: [id])
+  operation        CrmOperation?
+  payloadVersion   Int             @default(1)
+  externalId       String?
+  lastAttemptError String?
+
   @@index([status, scheduledFor])
   @@index([entityType, entityId])
 }
@@ -1696,6 +2028,419 @@ model LeadDoNotCallList {
   source      DncSource @default(OPS_ADD)
 
   @@index([email])
+}
+
+model LeadActivity {
+  id                String            @id @default(cuid())
+  leadId            String
+  lead              Lead              @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  activityType      LeadActivityType
+  channel           LeadChannel?
+  actorUserId       String?
+  actor             User?             @relation("LeadActivityActor", fields: [actorUserId], references: [id])
+  actorRole         String?
+  occurredAt        DateTime
+  summary           String?
+  outcome           String?
+  nextAction        String?
+  nextActionDueAt   DateTime?
+  metadata          Json?
+  relatedEntityType String?
+  relatedEntityId   String?
+  auditRef          String?
+  createdAt         DateTime          @default(now())
+  callRecords       CallDisposition[]
+
+  @@index([leadId, occurredAt])
+  @@index([actorUserId, occurredAt])
+  @@index([activityType])
+}
+
+model LeadStatusHistory {
+  id            String         @id @default(cuid())
+  leadId        String
+  lead          Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  fromStatus    LeadStatus?
+  toStatus      LeadStatus
+  event         LeadEvent
+  guardsPassed  Json?
+  actorUserId   String?
+  actor         User?          @relation("LeadStatusHistoryActor", fields: [actorUserId], references: [id])
+  actorRole     String?
+  reason        String?
+  occurredAt    DateTime
+  outboxEventId String?
+  outboxEvent   LeadOutboxEvent? @relation(fields: [outboxEventId], references: [id])
+  auditRef      String?
+
+  @@index([leadId, occurredAt])
+  @@index([actorUserId])
+  @@index([toStatus, occurredAt])
+}
+
+model LeadScore {
+  id                String       @id @default(cuid())
+  leadId            String
+  lead              Lead         @relation("LeadScoreHistory", fields: [leadId], references: [id], onDelete: Cascade)
+  score             Int
+  tier              LeadTier
+  breakdown         Json
+  configKey         String
+  configVersion     Int
+  triggerReason     ScoreTrigger
+  computedByUserId  String?
+  computedBy        User?        @relation("LeadScoreComputedBy", fields: [computedByUserId], references: [id])
+  computedAt        DateTime
+  notes             String?
+  latestForLead     Lead?        @relation("LeadLatestScore")
+
+  @@index([leadId, computedAt])
+  @@index([configKey, configVersion])
+}
+
+model LeadAssignment {
+  id               String         @id @default(cuid())
+  leadId           String
+  lead             Lead           @relation("LeadAssignmentHistory", fields: [leadId], references: [id], onDelete: Cascade)
+  assigneeUserId   String
+  assignee         User           @relation("LeadAssignmentAssignee", fields: [assigneeUserId], references: [id])
+  assignedByUserId String?
+  assignedBy       User?          @relation("LeadAssignmentAssigner", fields: [assignedByUserId], references: [id])
+  assignmentType   AssignmentType
+  reason           String?
+  startedAt        DateTime
+  endedAt          DateTime?
+  endReason        String?
+  siteId           String
+  site             Site           @relation(fields: [siteId], references: [id])
+  metadata         Json?
+  activeForLead    Lead?          @relation("LeadActiveAssignment")
+
+  @@index([leadId, startedAt])
+  @@index([assigneeUserId, startedAt])
+}
+
+model LeadFollowUp {
+  id                 String           @id @default(cuid())
+  leadId             String
+  lead               Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  ownerUserId        String
+  owner              User             @relation("LeadFollowUpOwner", fields: [ownerUserId], references: [id])
+  type               FollowUpType
+  priority           FollowUpPriority
+  reason             String?
+  dueAt              DateTime
+  status             FollowUpStatus
+  completedAt        DateTime?
+  completedByUserId  String?
+  completedBy        User?            @relation("LeadFollowUpCompletedBy", fields: [completedByUserId], references: [id])
+  outcome            String?
+  nextFollowUpId     String?
+  nextFollowUp       LeadFollowUp?    @relation("FollowUpChain", fields: [nextFollowUpId], references: [id])
+  previousInChain    LeadFollowUp[]   @relation("FollowUpChain")
+  rescheduledFromId  String?
+  rescheduledFrom    LeadFollowUp?    @relation("FollowUpReschedule", fields: [rescheduledFromId], references: [id])
+  rescheduledTo      LeadFollowUp[]   @relation("FollowUpReschedule")
+  cancelReason       String?
+  slaScheduleId      String?
+  slaSchedule        SlaSchedule?     @relation(fields: [slaScheduleId], references: [id])
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  callRecords        CallDisposition[]
+
+  @@index([leadId, createdAt])
+  @@index([status, dueAt])
+  @@index([ownerUserId, dueAt])
+}
+
+model CounsellingSession {
+  id               String             @id @default(cuid())
+  bookingId        String
+  booking          CounsellingBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  leadId           String
+  lead             Lead               @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  counsellorUserId String
+  counsellor       User               @relation("CounsellingSessionCounsellor", fields: [counsellorUserId], references: [id])
+  startedAt        DateTime?
+  endedAt          DateTime?
+  attendanceStatus SessionAttendance
+  notes            String?
+  recordedByUserId String
+  recordedBy       User               @relation("CounsellingSessionRecorder", fields: [recordedByUserId], references: [id])
+  recordedAt       DateTime
+  outcome          CounsellingOutcome?
+
+  @@index([bookingId])
+  @@index([leadId, recordedAt])
+  @@index([counsellorUserId, recordedAt])
+}
+
+model CounsellingOutcome {
+  id                   String                     @id @default(cuid())
+  sessionId            String                     @unique
+  session              CounsellingSession         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  leadId               String
+  lead                 Lead                       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  recommendation       CounsellingRecommendation
+  recommendedByUserId  String
+  recommendedBy        User                       @relation("CounsellingOutcomeRecommender", fields: [recommendedByUserId], references: [id])
+  rationale            String?
+  nextActionType       String?
+  nextActionAt         DateTime?
+  createdAt            DateTime                   @default(now())
+
+  @@index([leadId, createdAt])
+  @@index([recommendation])
+}
+
+model Campaign {
+  id                  String         @id @default(cuid())
+  name                String
+  code                String         @unique
+  source              LeadSource
+  medium              String?
+  channel             String?
+  startAt             DateTime
+  endAt               DateTime?
+  budgetInr           Decimal?       @db.Decimal(12, 2)
+  actualSpendInr      Decimal?       @db.Decimal(12, 2)
+  ownerUserId         String
+  owner               User           @relation("CampaignOwner", fields: [ownerUserId], references: [id])
+  creativeRefs        Json?
+  landingPageUrls     Json?
+  referralPartnerId   String?
+  utmDefaults         Json?
+  status              CampaignStatus
+  notes               String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  leads               Lead[]
+  firstTouchAttributions LeadAttribution[] @relation("AttrFirstCampaign")
+  lastTouchAttributions  LeadAttribution[] @relation("AttrLastCampaign")
+  attributionHistory  LeadAttributionHistory[]
+
+  @@index([status, startAt, endAt])
+}
+
+model LeadAttribution {
+  id                         String     @id @default(cuid())
+  leadId                     String     @unique
+  lead                       Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  firstTouchAt               DateTime
+  firstTouchSource           LeadSource
+  firstTouchCampaignId       String?
+  firstTouchCampaign         Campaign?  @relation("AttrFirstCampaign", fields: [firstTouchCampaignId], references: [id])
+  firstTouchMedium           String?
+  firstTouchChannel          String?
+  firstTouchCreativeRef      String?
+  firstTouchLandingUrl       String?
+  firstTouchReferralPartnerId String?
+  firstTouchUtm              Json?
+  lastTouchAt                DateTime
+  lastTouchSource            LeadSource
+  lastTouchCampaignId        String?
+  lastTouchCampaign          Campaign?  @relation("AttrLastCampaign", fields: [lastTouchCampaignId], references: [id])
+  lastTouchMedium            String?
+  lastTouchChannel           String?
+  lastTouchCreativeRef       String?
+  lastTouchLandingUrl        String?
+  lastTouchReferralPartnerId String?
+  lastTouchUtm               Json?
+  createdAt                  DateTime   @default(now())
+  updatedAt                  DateTime   @updatedAt
+
+  @@index([firstTouchCampaignId, createdAt])
+  @@index([lastTouchCampaignId, updatedAt])
+}
+
+model LeadAttributionHistory {
+  id                 String     @id @default(cuid())
+  leadId             String
+  lead               Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  touchAt            DateTime
+  source             LeadSource
+  campaignId         String?
+  campaign           Campaign?  @relation(fields: [campaignId], references: [id])
+  medium             String?
+  channel            String?
+  creativeRef        String?
+  landingUrl         String?
+  referralPartnerId  String?
+  utm                Json?
+  touchType          TouchType
+  capturedAt         DateTime
+
+  @@index([leadId, touchAt])
+  @@index([campaignId, touchAt])
+}
+
+model DuplicateCase {
+  id               String           @id @default(cuid())
+  leftLeadId       String
+  leftLead         Lead             @relation("DuplicateCaseLeft", fields: [leftLeadId], references: [id], onDelete: Cascade)
+  rightLeadId      String
+  rightLead        Lead             @relation("DuplicateCaseRight", fields: [rightLeadId], references: [id], onDelete: Cascade)
+  matchLevel       MatchLevel
+  matchSignals     Json
+  matchScore       Int
+  detectedAt       DateTime
+  reviewStatus     DupReviewStatus
+  reviewedByUserId String?
+  reviewedBy       User?            @relation("DuplicateCaseReviewer", fields: [reviewedByUserId], references: [id])
+  reviewedAt       DateTime?
+  reviewNotes      String?
+  mergeId          String?          @unique
+  resultingMerge   LeadMerge?       @relation("DupCaseToMerge", fields: [mergeId], references: [id])
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  initiatedMerges  LeadMerge[]      @relation("MergeBackToCase")
+
+  @@index([reviewStatus, matchLevel, detectedAt])
+  @@index([leftLeadId])
+  @@index([rightLeadId])
+}
+
+model LeadMerge {
+  id                    String            @id @default(cuid())
+  duplicateCaseId       String?
+  fromCase              DuplicateCase?    @relation("MergeBackToCase", fields: [duplicateCaseId], references: [id])
+  winnerLeadId          String
+  winner                Lead              @relation("LeadMergeWinner", fields: [winnerLeadId], references: [id], onDelete: Cascade)
+  loserLeadId           String            @unique
+  loser                 Lead              @relation("LeadMergeLoser", fields: [loserLeadId], references: [id], onDelete: Cascade)
+  decidedByUserId       String
+  decidedBy             User              @relation("LeadMergeDecidedBy", fields: [decidedByUserId], references: [id])
+  reason                String
+  activityCopyStrategy  MergeCopyStrategy
+  activitiesCopiedCount Int
+  mergedAt              DateTime
+  auditRef              String?
+  resolvingCases        DuplicateCase[]   @relation("DupCaseToMerge")
+}
+
+model LeadConversion {
+  id                   String           @id @default(cuid())
+  leadId               String           @unique
+  lead                 Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  targetType           ConversionTarget
+  targetEntityId       String
+  decidedByUserId      String
+  decidedBy            User             @relation("LeadConversionDecidedBy", fields: [decidedByUserId], references: [id])
+  eligibilitySnapshot  Json
+  outboxEventId        String?
+  outboxEvent          LeadOutboxEvent? @relation(fields: [outboxEventId], references: [id])
+  occurredAt           DateTime
+  notes                String?
+}
+
+model LeadConfig {
+  id                String    @id @default(cuid())
+  key               String
+  version           Int
+  payload           Json
+  payloadSchemaRef  String
+  ownerRole         UserRole
+  createdByUserId   String
+  createdBy         User      @relation("LeadConfigAuthor", fields: [createdByUserId], references: [id])
+  createdAt         DateTime  @default(now())
+  approvedByUserId  String?
+  approvedBy        User?     @relation("LeadConfigApprover", fields: [approvedByUserId], references: [id])
+  approvedAt        DateTime?
+  effectiveFrom     DateTime?
+  effectiveUntil    DateTime?
+  isActive          Boolean   @default(false)
+  notes             String?
+
+  @@unique([key, version])
+  @@index([key, effectiveFrom])
+}
+
+model LeadOutboxEvent {
+  id                 String         @id @default(cuid())
+  aggregateType      String
+  aggregateId        String
+  eventType          LeadEventType
+  eventVersion       Int
+  payload            Json
+  occurredAt         DateTime
+  enqueuedAt         DateTime       @default(now())
+  publishedAt        DateTime?
+  dispatchStatus     DispatchStatus @default(PENDING)
+  attemptCount       Int            @default(0)
+  lastAttemptAt      DateTime?
+  lastAttemptError   String?
+  lockedUntil        DateTime?
+  lockedByWorkerId   String?
+  statusHistoryRows  LeadStatusHistory[]
+  conversions        LeadConversion[]
+  crmJobs            CrmSyncQueue[]
+  dlqRows            LeadOutboxDlq[]
+
+  @@index([dispatchStatus, enqueuedAt])
+  @@index([aggregateId, occurredAt])
+}
+
+model LeadOutboxDlq {
+  id                 String         @id @default(cuid())
+  originalEventId    String
+  originalEvent      LeadOutboxEvent @relation(fields: [originalEventId], references: [id], onDelete: Cascade)
+  aggregateType      String
+  aggregateId        String
+  eventType          String
+  payload            Json
+  failureReason      String
+  attempts           Int
+  movedAt            DateTime
+  resolvedAt         DateTime?
+  resolvedByUserId   String?
+  resolvedBy         User?          @relation("OutboxDlqResolver", fields: [resolvedByUserId], references: [id])
+  resolutionAction   DlqResolution?
+}
+
+model NotificationTemplate {
+  id               String                 @id @default(cuid())
+  key              String
+  channel          NotificationChannel
+  provider         NotificationProvider
+  subject          String?
+  body             String
+  variables        Json
+  language         LeadLanguage
+  version          Int
+  isActive         Boolean                @default(false)
+  approvedByUserId String?
+  approvedBy       User?                  @relation("NotificationTemplateApprover", fields: [approvedByUserId], references: [id])
+  approvedAt       DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  deliveries       NotificationDeliveryLog[]
+
+  @@unique([key, channel, language, version])
+  @@index([channel, isActive])
+}
+
+model NotificationDeliveryLog {
+  id                 String                 @id @default(cuid())
+  leadId             String?
+  lead               Lead?                  @relation(fields: [leadId], references: [id])
+  templateId         String
+  template           NotificationTemplate   @relation(fields: [templateId], references: [id])
+  channel            NotificationChannel
+  provider           NotificationProvider
+  recipient          String
+  sentAt             DateTime
+  providerMessageId  String?
+  deliveryStatus     DeliveryStatus
+  statusUpdatedAt    DateTime?
+  failureReason      String?
+  dncCheckedAt       DateTime
+  dncPassed          Boolean
+  payloadHash        String?
+
+  @@index([leadId, sentAt])
+  @@index([deliveryStatus, sentAt])
+  @@index([provider, sentAt])
+  @@index([recipient, sentAt])
 }
 
 // ===== REPORTS MODULE (v1 · additive-only · read-only across platform) =====

@@ -19,6 +19,10 @@
       }
     ],
     "paths": {
+      "@/leads/domain": ["./src/lib/leads/domain"],
+      "@/leads/domain/*": ["./src/lib/leads/domain/*"],
+      "@/leads/testing": ["./src/lib/leads/testing"],
+      "@/leads/testing/*": ["./src/lib/leads/testing/*"],
       "@/*": ["./src/*"]
     }
   },
