@@ -3,22 +3,44 @@ import type { NextRequest } from "next/server";
 import { LeadPersonType, LeadSource } from "@prisma/client";
 
 import { createLeadFromIntake } from "@/lib/leads/create-lead";
+import {
+  leadWhatsappSignatureEnforced,
+  verifyMetaSignature,
+} from "@/lib/security/meta-whatsapp-signature";
+
+function hmacInvalid() {
+  return NextResponse.json(
+    {
+      error: {
+        code: "HMAC_INVALID",
+        message: "Invalid Meta signature",
+      },
+    },
+    { status: 401 },
+  );
+}
 
 /**
- * WhatsApp webhook stub (Gupshup/Twilio).
- * Accepts signature prefix stub_ok_* in x-gupshup-signature.
+ * WhatsApp Cloud API webhook. Signature: X-Hub-Signature-256 (HMAC-SHA256 of raw body).
  */
 export async function POST(req: NextRequest) {
-  const sig = req.headers.get("x-gupshup-signature") ?? "";
-  const expected = process.env.WHATSAPP_WEBHOOK_SECRET ?? "stub_ok_dev";
-  if (!sig.startsWith("stub_ok_") && sig !== expected) {
-    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+  const rawBody = await req.text();
+  const enforced = leadWhatsappSignatureEnforced();
+  const appSecret = process.env.META_APP_SECRET ?? "";
+
+  if (enforced) {
+    const ok = verifyMetaSignature(
+      { headers: req.headers, body: rawBody },
+      appSecret,
+    );
+    if (!ok) return hmacInvalid();
   }
 
-  // Ack immediately — process body best-effort
   let payload: Record<string, unknown> = {};
   try {
-    payload = (await req.json()) as Record<string, unknown>;
+    payload = rawBody
+      ? (JSON.parse(rawBody) as Record<string, unknown>)
+      : {};
   } catch {
     return NextResponse.json({ ok: true });
   }

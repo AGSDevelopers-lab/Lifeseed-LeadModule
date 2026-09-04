@@ -15,6 +15,9 @@ import { z } from "zod";
 
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import { resolveLeadActor } from "@/lib/leads/adapters/identity-adapter";
+import { assertLeadReadable } from "@/lib/leads/adapters/prisma-lead-repository";
+import { LeadOwnershipDeniedError } from "@/lib/leads/domain/errors";
 import {
   convertLeadToDonor,
   convertLeadToRecipient,
@@ -29,11 +32,26 @@ export type ActionResult =
   | { ok: false; error: string; code?: string };
 
 function catchErr(err: unknown): ActionResult {
+  if (err instanceof LeadOwnershipDeniedError) {
+    return { ok: false, error: "Lead not found" };
+  }
   if (err instanceof Response) {
     return { ok: false, error: err.status === 401 ? "Unauthorized" : "Forbidden" };
   }
   if (err instanceof Error) return { ok: false, error: err.message };
   return { ok: false, error: "Unexpected error" };
+}
+
+async function requireReadableLead(leadId: string) {
+  const actor = await resolveLeadActor();
+  if (!actor) {
+    throw new LeadOwnershipDeniedError("Authentication required", {
+      leadId,
+      denialReason: "AUTHENTICATION_REQUIRED",
+    });
+  }
+  await assertLeadReadable(leadId, actor);
+  return actor;
 }
 
 const dispositionSchema = z.object({
@@ -53,6 +71,7 @@ export async function saveDisposition(
     const parsed = dispositionSchema.safeParse(input);
     if (!parsed.success) return { ok: false, error: "Validation failed" };
     const d = parsed.data;
+    await requireReadableLead(d.leadId);
 
     const started = new Date(d.callStartedAt);
     const ended = d.callEndedAt ? new Date(d.callEndedAt) : new Date();
@@ -146,6 +165,7 @@ export async function bookCounselling(
     const parsed = bookSchema.safeParse(input);
     if (!parsed.success) return { ok: false, error: "Validation failed" };
     const d = parsed.data;
+    await requireReadableLead(d.leadId);
     const duration =
       d.durationMinutes ??
       Number(process.env.COUNSELLING_DEFAULT_DURATION_MIN ?? "30");
@@ -278,6 +298,7 @@ export async function convertDonorAction(
   try {
     const session = await requirePermission("lead.convert");
     await requirePermission("donor.create");
+    await requireReadableLead(leadId);
     const result = await convertLeadToDonor(leadId, session.userId, extras);
     if (!result.ok) return result;
     revalidatePath(`/telecaller/leads/${leadId}`);
@@ -294,6 +315,7 @@ export async function convertRecipientAction(
 ): Promise<ActionResult> {
   try {
     const session = await requirePermission("lead.convert");
+    await requireReadableLead(leadId);
     const result = await convertLeadToRecipient(leadId, session.userId, {
       clinicId,
     });
@@ -352,6 +374,7 @@ export async function reassignLead(
 ): Promise<ActionResult> {
   try {
     const session = await requirePermission("lead.assign");
+    await requireReadableLead(leadId);
     await assignLead(leadId, session.userId, telecallerId);
     revalidatePath("/admin/leads");
     revalidatePath(`/admin/leads/${leadId}`);
@@ -377,6 +400,7 @@ export async function listCounsellors() {
 export async function archiveLead(leadId: string): Promise<ActionResult> {
   try {
     const session = await requirePermission("lead.archive");
+    await requireReadableLead(leadId);
     const before = await prisma.lead.findUnique({ where: { id: leadId } });
     if (!before) return { ok: false, error: "Lead not found" };
     if (before.status === LeadStatus.CONVERTED) {
@@ -411,6 +435,7 @@ export async function archiveLead(leadId: string): Promise<ActionResult> {
 export async function forcePurgeLead(leadId: string): Promise<ActionResult> {
   try {
     const session = await requirePermission("lead.purge");
+    await requireReadableLead(leadId);
     const before = await prisma.lead.findUnique({ where: { id: leadId } });
     if (!before) return { ok: false, error: "Lead not found" };
     if (before.status === LeadStatus.CONVERTED) {

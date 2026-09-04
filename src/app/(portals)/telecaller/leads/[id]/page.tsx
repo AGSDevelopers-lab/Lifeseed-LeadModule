@@ -5,6 +5,9 @@ import { LeadStatus, UserRole } from "@prisma/client";
 import { LeadCallPanel } from "@/app/(portals)/telecaller/leads/[id]/lead-call-panel";
 import { Button, Card, CardContent, CardHeader, CardTitle } from "@/components/ui/primitives";
 import { prisma } from "@/lib/db";
+import { resolveLeadActor } from "@/lib/leads/adapters/identity-adapter";
+import { loadTelecallerLeadDetail } from "@/lib/leads/adapters/prisma-lead-repository";
+import { LeadOwnershipDeniedError } from "@/lib/leads/domain/errors";
 import {
   getSession,
   permissionGranted,
@@ -25,16 +28,16 @@ export default async function TelecallerLeadDetailPage({
   }
 
   const { id } = await params;
-  const lead = await prisma.lead.findUnique({
-    where: { id },
-    include: {
-      callDispositions: {
-        orderBy: { createdAt: "desc" },
-        take: 20,
-      },
-      counsellingBooking: true,
-    },
-  });
+  const actor = await resolveLeadActor();
+  if (!actor) redirect("/login");
+
+  let lead;
+  try {
+    lead = await loadTelecallerLeadDetail(id, actor);
+  } catch (err) {
+    if (err instanceof LeadOwnershipDeniedError) notFound();
+    throw err;
+  }
   if (!lead) notFound();
 
   const canConvert =

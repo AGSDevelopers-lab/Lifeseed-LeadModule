@@ -8,6 +8,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { prisma } from "@/lib/db";
+import { resolveLeadActor } from "@/lib/leads/adapters/identity-adapter";
+import { loadAdminLeadDetail } from "@/lib/leads/adapters/prisma-lead-repository";
+import { LeadOwnershipDeniedError } from "@/lib/leads/domain/errors";
 import { getSession, permissionGranted, permissionsForRoles } from "@/lib/rbac";
 import { cn } from "@/lib/utils";
 
@@ -64,26 +67,25 @@ export default async function AdminLeadDetailPage({
   if (!permissionGranted(perms, "lead.view")) redirect("/admin/leads");
 
   const { id } = await params;
-  const [lead, telecallers] = await Promise.all([
-    prisma.lead.findUnique({
-      where: { id },
-      include: {
-        assignedTelecaller: { select: { id: true, email: true } },
-        callDispositions: {
-          orderBy: { createdAt: "desc" },
-          include: { telecaller: { select: { email: true } } },
-        },
-        counsellingBooking: { include: { counsellor: { select: { email: true } } } },
-        convertedDonor: { select: { id: true, donorCode: true } },
-      },
-    }),
-    prisma.user.findMany({
-      where: { isActive: true, roles: { some: { role: UserRole.TELECALLER } } },
-      select: { id: true, email: true },
-      orderBy: { email: "asc" },
-      take: 100,
-    }),
-  ]);
+  const actor = await resolveLeadActor();
+  if (!actor) redirect("/login");
+
+  let lead: Awaited<ReturnType<typeof loadAdminLeadDetail>>;
+  let telecallers: Array<{ id: string; email: string }>;
+  try {
+    [lead, telecallers] = await Promise.all([
+      loadAdminLeadDetail(id, actor),
+      prisma.user.findMany({
+        where: { isActive: true, roles: { some: { role: UserRole.TELECALLER } } },
+        select: { id: true, email: true },
+        orderBy: { email: "asc" },
+        take: 100,
+      }),
+    ]);
+  } catch (err) {
+    if (err instanceof LeadOwnershipDeniedError) notFound();
+    throw err;
+  }
   if (!lead) notFound();
 
   const meta = asRec(lead.sourceMetadata);

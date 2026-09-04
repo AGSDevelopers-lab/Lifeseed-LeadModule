@@ -7,13 +7,21 @@ import {
   permissionGranted,
   permissionsForRoles,
 } from "@/lib/rbac";
+import {
+  authorizeLeadCronRequest,
+  hmacCronUnauthorizedJson,
+} from "@/lib/security/hmac-cron";
 
 export async function POST(req: NextRequest) {
-  const secret = process.env.LEADS_CRON_SECRET ?? process.env.CRON_SECRET;
-  const header = req.headers.get("x-cron-secret");
-  const cronOk = Boolean(secret && header && header === secret);
+  const cron = await authorizeLeadCronRequest(req);
 
-  if (!cronOk) {
+  if (!cron.ok) {
+    if (!cron.allowSessionFallback) {
+      return NextResponse.json(
+        hmacCronUnauthorizedJson(cron.code, cron.message),
+        { status: 401 },
+      );
+    }
     const session = await getSession();
     if (
       !session ||
@@ -22,7 +30,10 @@ export async function POST(req: NextRequest) {
         "crm.sync.manual",
       )
     ) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        hmacCronUnauthorizedJson(cron.code, cron.message),
+        { status: 401 },
+      );
     }
   }
 
