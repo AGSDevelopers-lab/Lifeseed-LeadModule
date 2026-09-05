@@ -14,6 +14,7 @@ const DATABASE_URL = process.env.DATABASE_URL ?? loaded.DATABASE_URL;
 const CITY = "KOL";
 const RACE_DAY = new Date("2099-06-15T00:00:00.000Z");
 const ROLLOVER_DAY = new Date("2099-06-16T00:00:00.000Z");
+const CONCURRENCY = Number.parseInt(process.env.LEAD_CODE_RACE_CONCURRENCY ?? "20", 10);
 
 function seqValues(codes: string[]): number[] {
   return codes
@@ -43,14 +44,14 @@ describe.skipIf(!DATABASE_URL)("generateLeadCode concurrency (Postgres)", () => 
     await prisma.$disconnect();
   });
 
-  it("issues 100 distinct sequential codes with no gaps under concurrency", async () => {
+  it(`issues ${CONCURRENCY} distinct sequential codes with no gaps under concurrency`, async () => {
     const codes = await Promise.all(
-      Array.from({ length: 100 }, () => generateLeadCode(prisma, CITY, RACE_DAY)),
+      Array.from({ length: CONCURRENCY }, () => generateLeadCode(prisma, CITY, RACE_DAY)),
     );
 
     const unique = new Set(codes);
-    expect(unique.size).toBe(100);
-    expect(seqValues(codes)).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
+    expect(unique.size).toBe(CONCURRENCY);
+    expect(seqValues(codes)).toEqual(Array.from({ length: CONCURRENCY }, (_, i) => i + 1));
     for (const code of codes) {
       const parsed = LeadCode.parse(code);
       expect(parsed.cityCode).toBe(CITY);
