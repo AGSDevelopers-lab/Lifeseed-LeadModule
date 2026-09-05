@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { bookCounselling } from "@/app/(portals)/leads/actions";
 import { Button, Input, Label } from "@/components/ui/primitives";
 
+/** Booking submits via bookCounselling → application/counselling (T-15). */
+
 function next14Days(): string[] {
   const days: string[] = [];
   const now = new Date();

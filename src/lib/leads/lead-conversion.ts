@@ -10,6 +10,7 @@ import {
 import { createDonorIntake } from "@/app/(portals)/admin/donors/actions";
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import { applyAuthorizedLeadStatus } from "@/lib/leads/adapters/prisma-lead-repository";
 import { markCompletedByEntity } from "@/lib/sla/engine";
 
 export type DonorConvertExtras = {
@@ -37,6 +38,7 @@ export async function convertLeadToDonor(
   leadId: string,
   actorId: string,
   extras: DonorConvertExtras,
+  options: { skipStatusWrite?: boolean } = {},
 ): Promise<{ ok: true; donorId: string } | { ok: false; error: string }> {
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) return { ok: false, error: "Lead not found" };
@@ -103,23 +105,24 @@ export async function convertLeadToDonor(
       ? (lead.sourceMetadata as Record<string, unknown>)
       : {};
 
-  await prisma.lead.update({
-    where: { id: leadId },
-    data: {
-      status: LeadStatus.CONVERTED,
-      convertedDonorId: donorId,
-      convertedAt: new Date(),
-      convertedByUserId: actorId,
-      retentionExpiresAt: null,
-      lastActivityAt: new Date(),
-      sourceMetadata: {
-        ...prevMeta,
-        preferredIntakeAt: extras.preferredIntakeAt ?? null,
-        coordinatorUserId: extras.coordinatorUserId ?? null,
-        aadhaarDeferred: !aadhaarHash,
-      } as Prisma.InputJsonValue,
-    },
-  });
+  const compat = {
+    convertedDonorId: donorId,
+    convertedAt: new Date(),
+    convertedByUserId: actorId,
+    retentionExpiresAt: null,
+    lastActivityAt: new Date(),
+    sourceMetadata: {
+      ...prevMeta,
+      preferredIntakeAt: extras.preferredIntakeAt ?? null,
+      coordinatorUserId: extras.coordinatorUserId ?? null,
+      aadhaarDeferred: !aadhaarHash,
+    } as Prisma.InputJsonValue,
+  };
+  if (options.skipStatusWrite) {
+    await prisma.lead.update({ where: { id: leadId }, data: compat });
+  } else {
+    await applyAuthorizedLeadStatus(leadId, LeadStatus.CONVERTED, compat);
+  }
 
   await markCompletedByEntity(SlaEntityType.LEAD_RESPONSE, leadId).catch(
     () => undefined,
@@ -174,6 +177,7 @@ export async function convertLeadToRecipient(
   leadId: string,
   actorId: string,
   input: RecipientConvertInput,
+  options: { skipStatusWrite?: boolean } = {},
 ): Promise<{ ok: true; recipientId: string } | { ok: false; error: string }> {
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead) return { ok: false, error: "Lead not found" };
@@ -210,17 +214,18 @@ export async function convertLeadToRecipient(
     },
   });
 
-  await prisma.lead.update({
-    where: { id: leadId },
-    data: {
-      status: LeadStatus.CONVERTED,
-      convertedRecipientId: recipient.id,
-      convertedAt: new Date(),
-      convertedByUserId: actorId,
-      retentionExpiresAt: null,
-      lastActivityAt: new Date(),
-    },
-  });
+  const compat = {
+    convertedRecipientId: recipient.id,
+    convertedAt: new Date(),
+    convertedByUserId: actorId,
+    retentionExpiresAt: null,
+    lastActivityAt: new Date(),
+  };
+  if (options.skipStatusWrite) {
+    await prisma.lead.update({ where: { id: leadId }, data: compat });
+  } else {
+    await applyAuthorizedLeadStatus(leadId, LeadStatus.CONVERTED, compat);
+  }
 
   await audit.log({
     actorUserId: actorId,

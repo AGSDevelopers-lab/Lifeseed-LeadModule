@@ -81,7 +81,7 @@ export function LeadAdminActions({
             </select>
           )}
           {action === "dnc" && <p className="text-sm text-stone-600">Adds {phone ?? "—"} / {email ?? "—"} to DNC.</p>}
-          {action === "archive" && <p className="text-sm text-stone-600">Soft-archives (tier ARCHIVED, status LOST).</p>}
+          { action === "archive" && <p className="text-sm text-stone-600">Archives the lead (isArchived) without changing conversion status. Confirm to continue.</p>}
           {action === "purge" && <p className="text-sm text-red-700">Permanently redacts PII. Cannot be undone.</p>}
           <DialogFooter>
             <DialogCloseButton onClick={() => setAction(null)} />

@@ -16,8 +16,12 @@ import { z } from "zod";
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { resolveLeadActor } from "@/lib/leads/adapters/identity-adapter";
-import { assertLeadReadable } from "@/lib/leads/adapters/prisma-lead-repository";
+import { applyAuthorizedLeadStatus, assertLeadReadable } from "@/lib/leads/adapters/prisma-lead-repository";
 import { LeadOwnershipDeniedError } from "@/lib/leads/domain/errors";
+import {
+  getLeadStateMachineMode,
+  stateMachinePersistsSideEffects,
+} from "@/lib/leads/application/feature-flag";
 import {
   convertLeadToDonor,
   convertLeadToRecipient,
@@ -34,6 +38,12 @@ export type ActionResult =
 function catchErr(err: unknown): ActionResult {
   if (err instanceof LeadOwnershipDeniedError) {
     return { ok: false, error: "Lead not found" };
+  }
+  if (err && typeof err === "object" && "code" in err && "message" in err) {
+    const code = String((err as { code: unknown }).code);
+    if (code.startsWith("LEAD_")) {
+      return { ok: false, error: String((err as { message: unknown }).message), code };
+    }
   }
   if (err instanceof Response) {
     return { ok: false, error: err.status === 401 ? "Unauthorized" : "Forbidden" };
@@ -71,7 +81,7 @@ export async function saveDisposition(
     const parsed = dispositionSchema.safeParse(input);
     if (!parsed.success) return { ok: false, error: "Validation failed" };
     const d = parsed.data;
-    await requireReadableLead(d.leadId);
+    const actor = await requireReadableLead(d.leadId);
 
     const started = new Date(d.callStartedAt);
     const ended = d.callEndedAt ? new Date(d.callEndedAt) : new Date();
@@ -103,16 +113,42 @@ export async function saveDisposition(
       LOST: LeadStatus.LOST,
     };
 
-    await prisma.lead.update({
-      where: { id: d.leadId },
-      data: {
-        status: statusMap[d.disposition] ?? LeadStatus.ASSIGNED,
+    const eventMap: Partial<
+      Record<
+        CallDispositionType,
+        | "disposition_qualified"
+        | "disposition_not_interested"
+        | "disposition_callback"
+        | "disposition_not_reachable"
+        | "disposition_wrong_number"
+        | "disposition_do_not_call"
+      >
+    > = {
+      CONTACTED_QUALIFIED: "disposition_qualified",
+      CONTACTED_NOT_INTERESTED: "disposition_not_interested",
+      CONTACTED_CALLBACK_REQUESTED: "disposition_callback",
+      NOT_REACHABLE: "disposition_not_reachable",
+      WRONG_NUMBER: "disposition_wrong_number",
+      DO_NOT_CALL: "disposition_do_not_call",
+    };
+
+    if (stateMachinePersistsSideEffects(getLeadStateMachineMode()) && eventMap[d.disposition]) {
+      const { qualifyLead } = await import("@/lib/leads/application/qualify");
+      await qualifyLead(d.leadId, actor, eventMap[d.disposition]!, {
+        notes: d.notes,
+        dueAt: d.followupAt ? new Date(d.followupAt) : null,
+        callStartedAt: started,
+        callEndedAt: ended,
+        reason: d.notes ?? d.disposition,
+      });
+    } else {
+      await applyAuthorizedLeadStatus(d.leadId, statusMap[d.disposition] ?? LeadStatus.ASSIGNED, {
         doNotCallFlag: d.disposition === CallDispositionType.DO_NOT_CALL,
         lastActivityAt: new Date(),
         lostReason:
           d.disposition === CallDispositionType.LOST ? d.notes ?? "Lost" : undefined,
-      },
-    });
+      });
+    }
 
     if (d.disposition === CallDispositionType.DO_NOT_CALL) {
       const lead = await prisma.lead.findUnique({ where: { id: d.leadId } });
@@ -165,10 +201,27 @@ export async function bookCounselling(
     const parsed = bookSchema.safeParse(input);
     if (!parsed.success) return { ok: false, error: "Validation failed" };
     const d = parsed.data;
-    await requireReadableLead(d.leadId);
+    const actor = await requireReadableLead(d.leadId);
     const duration =
       d.durationMinutes ??
       Number(process.env.COUNSELLING_DEFAULT_DURATION_MIN ?? "30");
+
+    if (stateMachinePersistsSideEffects(getLeadStateMachineMode())) {
+      await (await import("@/lib/leads/application/counselling")).bookCounsellingSession(
+        d.leadId,
+        actor,
+        {
+          counsellorUserId: d.counsellorUserId,
+          scheduledAt: new Date(d.scheduledAt),
+          mode: d.mode,
+          meetingUrl: d.meetingUrl ?? null,
+          meetingLocation: d.meetingLocation ?? null,
+          durationMinutes: duration,
+        },
+      );
+      revalidatePath(`/telecaller/leads/${d.leadId}`);
+      return { ok: true };
+    }
 
     const booking = await prisma.counsellingBooking.upsert({
       where: { leadId: d.leadId },
@@ -195,12 +248,8 @@ export async function bookCounselling(
       },
     });
 
-    await prisma.lead.update({
-      where: { id: d.leadId },
-      data: {
-        status: LeadStatus.COUNSELLING_BOOKED,
-        lastActivityAt: new Date(),
-      },
+    await applyAuthorizedLeadStatus(d.leadId, LeadStatus.COUNSELLING_BOOKED, {
+      lastActivityAt: new Date(),
     });
 
     const scheduled = new Date(d.scheduledAt);
@@ -258,16 +307,11 @@ export async function markCounsellingSession(
         followupNotes: notes ?? undefined,
       },
     });
-    await prisma.lead.update({
-      where: { id: booking.leadId },
-      data: {
-        status:
-          status === "ATTENDED"
-            ? LeadStatus.COUNSELLING_ATTENDED
-            : LeadStatus.COUNSELLING_NO_SHOW,
-        lastActivityAt: new Date(),
-      },
-    });
+    await applyAuthorizedLeadStatus(
+      booking.leadId,
+      status === "ATTENDED" ? LeadStatus.COUNSELLING_ATTENDED : LeadStatus.COUNSELLING_NO_SHOW,
+      { lastActivityAt: new Date() },
+    );
     await audit.log({
       actorUserId: session.userId,
       action: "counsellor.mark",
@@ -298,7 +342,18 @@ export async function convertDonorAction(
   try {
     const session = await requirePermission("lead.convert");
     await requirePermission("donor.create");
-    await requireReadableLead(leadId);
+    const actor = await requireReadableLead(leadId);
+    if (stateMachinePersistsSideEffects(getLeadStateMachineMode())) {
+      const result = await (await import("@/lib/leads/application/convert")).convertDonor(
+        leadId,
+        actor,
+        extras,
+      );
+      if (!result.ok) return result;
+      revalidatePath(`/telecaller/leads/${leadId}`);
+      revalidatePath("/admin/donors");
+      return { ok: true, id: result.donorId };
+    }
     const result = await convertLeadToDonor(leadId, session.userId, extras);
     if (!result.ok) return result;
     revalidatePath(`/telecaller/leads/${leadId}`);
@@ -350,7 +405,7 @@ export async function addToDnc(input: {
     });
     await prisma.lead.updateMany({
       where: { phone: input.phone },
-      data: { doNotCallFlag: true, status: LeadStatus.DO_NOT_CALL },
+      data: { doNotCallFlag: true },
     });
     await audit.log({
       actorUserId: session.userId,
@@ -400,21 +455,25 @@ export async function listCounsellors() {
 export async function archiveLead(leadId: string): Promise<ActionResult> {
   try {
     const session = await requirePermission("lead.archive");
-    await requireReadableLead(leadId);
+    const actor = await requireReadableLead(leadId);
     const before = await prisma.lead.findUnique({ where: { id: leadId } });
     if (!before) return { ok: false, error: "Lead not found" };
     if (before.status === LeadStatus.CONVERTED) {
       return { ok: false, error: "Converted leads cannot be archived" };
     }
-    await prisma.lead.update({
-      where: { id: leadId },
-      data: {
-        tier: LeadTier.ARCHIVED,
-        status: LeadStatus.LOST,
-        lostReason: "Archived by admin",
-        lastActivityAt: new Date(),
-      },
+    if (stateMachinePersistsSideEffects(getLeadStateMachineMode())) {
+      await (await import("@/lib/leads/application/archive")).archiveLead(
+        leadId,
+        actor,
+        "Archived by admin",
+      );
+    } else {
+    await applyAuthorizedLeadStatus(leadId, LeadStatus.LOST, {
+      tier: LeadTier.ARCHIVED,
+      lostReason: "Archived by admin",
+      lastActivityAt: new Date(),
     });
+    }
     await audit.log({
       actorUserId: session.userId,
       action: "lead.archive",
@@ -442,20 +501,16 @@ export async function forcePurgeLead(leadId: string): Promise<ActionResult> {
       return { ok: false, error: "Converted leads cannot be purged" };
     }
     const now = new Date();
-    await prisma.lead.update({
-      where: { id: leadId },
-      data: {
-        status: LeadStatus.EXPIRED_AUTO_PURGED,
-        fullName: null,
-        phone: null,
-        email: null,
-        city: null,
-        state: null,
-        pincode: null,
-        consentIp: null,
-        consentUserAgent: null,
-        lastActivityAt: now,
-      },
+    await applyAuthorizedLeadStatus(leadId, LeadStatus.EXPIRED_AUTO_PURGED, {
+      fullName: null,
+      phone: null,
+      email: null,
+      city: null,
+      state: null,
+      pincode: null,
+      consentIp: null,
+      consentUserAgent: null,
+      lastActivityAt: now,
     });
     await audit.log({
       actorUserId: session.userId,

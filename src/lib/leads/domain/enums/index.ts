@@ -91,6 +91,8 @@ export const LeadEvent = {
   reactivate: "reactivate",
   expire_by_retention: "expire_by_retention",
   merge_loser: "merge_loser",
+  /** T-21 / T-24 / T-25 / T-26 — present in 04 workflow, omitted from 03 enum list. */
+  mark_lost: "mark_lost",
 } as const;
 export type LeadEvent = (typeof LeadEvent)[keyof typeof LeadEvent];
 

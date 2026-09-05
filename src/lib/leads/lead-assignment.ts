@@ -2,6 +2,11 @@ import { LeadStatus, LeadTier, UserRole } from "@prisma/client";
 
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import { applyAuthorizedLeadStatus } from "@/lib/leads/adapters/prisma-lead-repository";
+import {
+  getLeadStateMachineMode,
+  stateMachinePersistsSideEffects,
+} from "@/lib/leads/application/feature-flag";
 
 function maxQueue(): number {
   const n = Number(process.env.LEADS_MAX_QUEUE_PER_TELECALLER ?? "20");
@@ -30,15 +35,24 @@ export async function assignLead(
   forceUserId?: string,
 ): Promise<string | null> {
   if (forceUserId) {
-    await prisma.lead.update({
-      where: { id: leadId },
-      data: {
+    if (stateMachinePersistsSideEffects(getLeadStateMachineMode())) {
+      const { assignLeadToUser, reassignLeadToUser } = await import(
+        "@/lib/leads/application/commands"
+      );
+      const actor = { userId: actorId ?? forceUserId, roles: ["OPS_MANAGER"] };
+      const existing = await prisma.lead.findUnique({ where: { id: leadId }, select: { status: true } });
+      if (existing?.status === LeadStatus.ASSIGNED) {
+        await reassignLeadToUser(leadId, actor, forceUserId, "manual reassign");
+      } else {
+        await assignLeadToUser(leadId, actor, forceUserId);
+      }
+    } else {
+      await applyAuthorizedLeadStatus(leadId, LeadStatus.ASSIGNED, {
         assignedTelecallerId: forceUserId,
         assignedAt: new Date(),
-        status: LeadStatus.ASSIGNED,
         lastActivityAt: new Date(),
-      },
-    });
+      });
+    }
     await audit.log({
       actorUserId: actorId ?? forceUserId,
       action: "lead.assign",
@@ -79,15 +93,20 @@ export async function assignLead(
   if (eligible.length === 0) return null;
 
   const chosen = eligible[0].id;
-  await prisma.lead.update({
-    where: { id: leadId },
-    data: {
+  if (stateMachinePersistsSideEffects(getLeadStateMachineMode())) {
+    const { assignLeadToUser } = await import("@/lib/leads/application/commands");
+    await assignLeadToUser(
+      leadId,
+      { userId: actorId ?? chosen, roles: ["SYSTEM", "OPS_MANAGER"] },
+      chosen,
+    );
+  } else {
+    await applyAuthorizedLeadStatus(leadId, LeadStatus.ASSIGNED, {
       assignedTelecallerId: chosen,
       assignedAt: new Date(),
-      status: LeadStatus.ASSIGNED,
       lastActivityAt: new Date(),
-    },
-  });
+    });
+  }
 
   await audit.log({
     actorUserId: actorId ?? null,

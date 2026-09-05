@@ -4,6 +4,7 @@ import { LeadStatus } from "@prisma/client";
 
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import { applyAuthorizedLeadStatus } from "@/lib/leads/adapters/prisma-lead-repository";
 import {
   getSession,
   permissionGranted,
@@ -53,20 +54,16 @@ export async function POST(req: NextRequest) {
 
   let purged = 0;
   for (const lead of expired) {
-    await prisma.lead.update({
-      where: { id: lead.id },
-      data: {
-        status: LeadStatus.EXPIRED_AUTO_PURGED,
-        fullName: null,
-        phone: null,
-        email: null,
-        city: null,
-        state: null,
-        pincode: null,
-        consentIp: null,
-        consentUserAgent: null,
-        lastActivityAt: now,
-      },
+    await applyAuthorizedLeadStatus(lead.id, LeadStatus.EXPIRED_AUTO_PURGED, {
+      fullName: null,
+      phone: null,
+      email: null,
+      city: null,
+      state: null,
+      pincode: null,
+      consentIp: null,
+      consentUserAgent: null,
+      lastActivityAt: now,
     });
     await audit.log({
       actorUserId: cronOk ? null : (await getSession())?.userId ?? null,

@@ -12,7 +12,7 @@ import {
 } from "@/app/(portals)/leads/actions";
 import { Button, Input, Label } from "@/components/ui/primitives";
 
-/** Mutations call server actions that load the lead via LeadRepository.byId (IDOR closed). */
+/** Mutations go through server actions → application/qualify (never Prisma status writes). */
 
 export function LeadCallPanel({
   leadId,

@@ -2,7 +2,6 @@ import {
   CrmEntityType,
   LeadPersonType,
   LeadSource,
-  LeadStatus,
   type LeadDonorSubType,
   type Prisma,
 } from "@prisma/client";
@@ -11,7 +10,6 @@ import { audit } from "@/lib/audit";
 import { enqueue } from "@/lib/crm/sync-queue";
 import { prisma } from "@/lib/db";
 import {
-  assignLead,
   scheduleLeadSlaForTier,
 } from "@/lib/leads/lead-assignment";
 import { allocateLeadCode } from "@/lib/leads/adapters/prisma-lead-code-generator";
@@ -49,7 +47,8 @@ export async function isOnDoNotCallList(phone: string): Promise<boolean> {
   return true;
 }
 
-export async function createLeadFromIntake(input: CreateLeadInput) {
+/** Raw intake persist (T-01 row). Status omitted — Prisma default NEW. */
+export async function persistNewLead(input: CreateLeadInput) {
   if (!input.consentDataProcessing) {
     throw new Error("Data processing consent is required (DPDP)");
   }
@@ -97,7 +96,6 @@ export async function createLeadFromIntake(input: CreateLeadInput) {
       score: scored.score,
       scoreBreakdown: scored.breakdown as Prisma.InputJsonValue,
       tier: scored.tier,
-      status: LeadStatus.NEW,
       consentMarketing: input.consentMarketing,
       consentScreening: input.consentScreening,
       consentDataProcessing: input.consentDataProcessing,
@@ -109,7 +107,6 @@ export async function createLeadFromIntake(input: CreateLeadInput) {
     },
   });
 
-  await assignLead(lead.id, input.actorId, input.assignToUserId ?? undefined);
   await scheduleLeadSlaForTier(lead.id, scored.tier, capturedAt);
   await enqueue(CrmEntityType.LEAD, lead.id, undefined, {
     leadCode,
@@ -134,4 +131,9 @@ export async function createLeadFromIntake(input: CreateLeadInput) {
     where: { id: lead.id },
   });
   return refreshed;
+}
+
+export async function createLeadFromIntake(input: CreateLeadInput) {
+  const { intakeLead } = await import("@/lib/leads/application/intake");
+  return intakeLead(input);
 }

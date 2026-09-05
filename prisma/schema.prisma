@@ -1627,6 +1627,7 @@ enum LeadEvent {
   reactivate
   expire_by_retention
   merge_loser
+  mark_lost
 }
 
 enum AssignmentType {

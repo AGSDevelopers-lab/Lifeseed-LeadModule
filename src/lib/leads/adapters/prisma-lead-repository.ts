@@ -248,3 +248,63 @@ export async function assertLeadReadable(
   }
   return lead;
 }
+
+/** Sole authorised Lead.status writer besides persistBundle. */
+export async function applyAuthorizedLeadStatus(
+  leadId: string,
+  nextStatus: LeadStatus,
+  extra: Prisma.LeadUncheckedUpdateInput = {},
+): Promise<void> {
+  await prisma.lead.update({
+    where: { id: leadId },
+    data: { status: nextStatus, ...extra },
+  });
+}
+
+export async function runLeadWriteTransaction<T>(
+  fn: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  return prisma.$transaction((tx) => fn(tx as Prisma.TransactionClient));
+}
+
+export async function appendActivity(
+  tx: Prisma.TransactionClient,
+  data: Prisma.LeadActivityCreateInput,
+) {
+  return tx.leadActivity.create({ data });
+}
+
+export async function appendStatusHistory(
+  tx: Prisma.TransactionClient,
+  data: Prisma.LeadStatusHistoryCreateInput,
+) {
+  return tx.leadStatusHistory.create({ data });
+}
+
+export async function appendAssignment(
+  tx: Prisma.TransactionClient,
+  data: Prisma.LeadAssignmentCreateInput,
+) {
+  return tx.leadAssignment.create({ data });
+}
+
+export async function appendScore(
+  tx: Prisma.TransactionClient,
+  data: Prisma.LeadScoreCreateInput,
+) {
+  return tx.leadScore.create({ data });
+}
+
+export async function appendFollowUp(
+  tx: Prisma.TransactionClient,
+  data: Prisma.LeadFollowUpCreateInput,
+) {
+  return tx.leadFollowUp.create({ data });
+}
+
+export async function appendOutboxEvent(
+  tx: Prisma.TransactionClient,
+  data: Prisma.LeadOutboxEventCreateInput,
+) {
+  return tx.leadOutboxEvent.create({ data });
+}
