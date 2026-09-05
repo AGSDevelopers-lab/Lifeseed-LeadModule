@@ -1905,6 +1905,17 @@ model Lead {
   @@index([mergedIntoLeadId])
 }
 
+/// Per city+UTC-day sequence for LED-{CITY}-{YYYYMMDD}-{XXXX} (B03).
+model LeadCodeSequence {
+  cityCode       String   @map("city_code")
+  day            DateTime @map("day") @db.Date
+  lastUsedNumber Int      @default(0) @map("last_used_number")
+  updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@id([cityCode, day])
+  @@map("lead_code_sequences")
+}
+
 model CallDisposition {
   id              String               @id @default(cuid())
   leadId          String

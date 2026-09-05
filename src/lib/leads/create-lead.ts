@@ -14,10 +14,7 @@ import {
   assignLead,
   scheduleLeadSlaForTier,
 } from "@/lib/leads/lead-assignment";
-import {
-  generateLeadCode,
-  leadCodePrefix,
-} from "@/lib/leads/lead-code-generator";
+import { allocateLeadCode } from "@/lib/leads/adapters/prisma-lead-code-generator";
 import { scoreLead } from "@/lib/leads/lead-scoring";
 
 export type CreateLeadInput = {
@@ -61,11 +58,7 @@ export async function createLeadFromIntake(input: CreateLeadInput) {
   }
 
   const capturedAt = new Date();
-  const prefix = leadCodePrefix(input.city, capturedAt);
-  const count = await prisma.lead.count({
-    where: { leadCode: { startsWith: prefix } },
-  });
-  const leadCode = generateLeadCode(input.city, capturedAt, count + 1);
+  const leadCode = await allocateLeadCode(prisma, input.city, capturedAt);
 
   const scored = scoreLead({
     personType: input.personType,
