@@ -249,6 +249,12 @@ export async function assertLeadReadable(
   return lead;
 }
 
+/** Interactive-tx options for pgBouncer transaction-mode (Supabase :6543). */
+export const LEAD_INTERACTIVE_TX_OPTIONS = {
+  maxWait: 10_000,
+  timeout: 20_000,
+} as const;
+
 /** Sole authorised Lead.status writer besides persistBundle. */
 export async function applyAuthorizedLeadStatus(
   leadId: string,
@@ -264,7 +270,10 @@ export async function applyAuthorizedLeadStatus(
 export async function runLeadWriteTransaction<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> {
-  return prisma.$transaction((tx) => fn(tx as Prisma.TransactionClient));
+  return prisma.$transaction(
+    (tx) => fn(tx as Prisma.TransactionClient),
+    LEAD_INTERACTIVE_TX_OPTIONS,
+  );
 }
 
 export async function appendActivity(

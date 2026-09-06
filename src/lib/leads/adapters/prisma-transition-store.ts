@@ -23,7 +23,10 @@ import type { Lead } from "../domain/entities/Lead";
 import type { ActorContext } from "../domain/ports/shared";
 import type { DomainWrite } from "../domain/state-machine/types";
 import { LeadInvariantViolationError } from "../domain/errors";
-import { prismaLeadRepository } from "./prisma-lead-repository";
+import {
+  LEAD_INTERACTIVE_TX_OPTIONS,
+  prismaLeadRepository,
+} from "./prisma-lead-repository";
 import type { TransitionStore } from "../application/__apply-transition";
 
 type Tx = Omit<
@@ -433,7 +436,7 @@ export class PrismaLeadTransitionStore implements TransitionStore {
         status: lead.status,
         latestHistoryToStatus: history?.toStatus ?? latestHistoryToStatus,
       };
-    });
+    }, LEAD_INTERACTIVE_TX_OPTIONS);
   }
 }
 

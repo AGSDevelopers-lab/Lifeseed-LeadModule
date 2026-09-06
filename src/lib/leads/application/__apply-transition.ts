@@ -13,6 +13,12 @@ import {
   stateMachinePersistsSideEffects,
 } from "./feature-flag";
 
+/**
+ * Persist is delegated to TransitionStore.persistBundle (PrismaLeadTransitionStore),
+ * which must open prisma.$transaction with LEAD_INTERACTIVE_TX_OPTIONS
+ * (maxWait 10s, timeout 20s). Do not split that transaction.
+ */
+
 export type TransitionStore = {
   load(id: string, ctx?: ActorContext): Promise<Lead | null>;
   persistBundle(input: {
