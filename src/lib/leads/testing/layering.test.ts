@@ -4,35 +4,68 @@ import { fileURLToPath } from "node:url";
 import { Linter } from "eslint";
 import { describe, expect, it } from "vitest";
 
+import { FORBIDDEN_DOMAIN_IMPORT_SNIPPETS } from "./negative/forbidden-domain-imports";
+
 const filename = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   "../domain/layering-probe.ts",
 );
 
-describe("ESLint layering guard", () => {
-  it("rejects @prisma/client imports inside domain", () => {
-    const linter = new Linter();
-    const messages = linter.verify(
-      `import { PrismaClient } from "@prisma/client";\nexport const x = PrismaClient;\n`,
-      {
-        files: ["**/*.ts"],
-        languageOptions: { parserOptions: { ecmaVersion: 2022, sourceType: "module" } },
-        rules: {
-          "no-restricted-imports": [
-            "error",
-            {
-              paths: [
-                {
-                  name: "@prisma/client",
-                  message: "Lead domain must stay framework-free (no Prisma).",
-                },
-              ],
-            },
-          ],
+const domainRestrictedImports: Linter.RulesRecord = {
+  "no-restricted-imports": [
+    "error",
+    {
+      paths: [
+        {
+          name: "@prisma/client",
+          message: "Lead domain must stay framework-free (no Prisma).",
         },
-      },
-      { filename },
-    );
-    expect(messages.some((m) => m.ruleId === "no-restricted-imports")).toBe(true);
-  });
+        {
+          name: "prisma",
+          message: "Lead domain must stay framework-free (no Prisma).",
+        },
+        {
+          name: "next",
+          message: "Lead domain must stay framework-free (no Next.js).",
+        },
+        {
+          name: "react",
+          message: "Lead domain must stay framework-free (no React).",
+        },
+      ],
+      patterns: [
+        {
+          group: ["next/*", "react/*", "react-dom", "react-dom/*"],
+          message: "Lead domain must stay framework-free.",
+        },
+        {
+          group: ["**/leads/adapters/**", "../adapters/*", "../../adapters/*"],
+          message: "Lead domain must not import adapters.",
+        },
+      ],
+    },
+  ],
+};
+
+function lintAsDomain(code: string) {
+  const linter = new Linter();
+  return linter.verify(
+    code,
+    {
+      files: ["**/*.ts"],
+      languageOptions: { parserOptions: { ecmaVersion: 2022, sourceType: "module" } },
+      rules: domainRestrictedImports,
+    },
+    { filename },
+  );
+}
+
+describe("ESLint layering guard", () => {
+  it.each(Object.entries(FORBIDDEN_DOMAIN_IMPORT_SNIPPETS))(
+    "rejects %s import inside domain",
+    (_name, snippet) => {
+      const messages = lintAsDomain(snippet);
+      expect(messages.some((m) => m.ruleId === "no-restricted-imports")).toBe(true);
+    },
+  );
 });

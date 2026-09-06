@@ -1,24 +1,25 @@
 import type { Lead as PrismaLead, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
+import type { LeadActivity } from "../domain/entities/LeadActivity";
+import type { LeadAssignment } from "../domain/entities/LeadAssignment";
+import type { LeadFollowUp } from "../domain/entities/LeadFollowUp";
+import type { LeadOutboxEvent } from "../domain/entities/LeadOutboxEvent";
+import type { LeadScore } from "../domain/entities/LeadScore";
+import type { LeadStatusHistory } from "../domain/entities/LeadStatusHistory";
 import { Lead } from "../domain/entities/Lead";
 import { LeadOwnershipDeniedError } from "../domain/errors";
-import {
-  LeadOutcome,
-  LeadPersonType,
-  LeadSource,
-  LeadStatus,
-  LeadTier,
-  type LeadDonorSubType,
-} from "../domain/enums";
+import { LeadStatus } from "../domain/enums";
 import type { LeadRepository } from "../domain/ports/LeadRepository";
 import type { ActorContext } from "../domain/ports/shared";
-import { ArchiveMeta } from "../domain/value-objects/ArchiveMeta";
-import { Consent } from "../domain/value-objects/Consent";
-import { ContactInfo } from "../domain/value-objects/ContactInfo";
-import { LeadCode } from "../domain/value-objects/LeadCode";
-import { TierScore } from "../domain/value-objects/TierScore";
 import { evaluateLeadAccess } from "./lead-access-scope";
+import { activityToDomain } from "./mappers/activity-mapper";
+import { assignmentToDomain } from "./mappers/assignment-mapper";
+import { followUpToDomain } from "./mappers/follow-up-mapper";
+import { leadToDomain } from "./mappers/lead-mapper";
+import { outboxEventToDomain } from "./mappers/outbox-event-mapper";
+import { scoreToDomain } from "./mappers/score-mapper";
+import { statusHistoryToDomain } from "./mappers/status-history-mapper";
 import {
   prismaLeadAudit,
   type LeadAccessAuditor,
@@ -49,64 +50,7 @@ export type LeadReadDb = {
 };
 
 function toDomain(row: LeadAccessRow): Lead {
-  const archive =
-    row.isArchived && row.archivedAt
-      ? new ArchiveMeta(row.archivedAt, row.archivedByUserId, row.archiveReason)
-      : null;
-  const scoreValue = row.latestScoreValue ?? row.score;
-  const latestScore = new TierScore(
-    Math.min(100, Math.max(0, Math.round(scoreValue))),
-    row.tier as (typeof LeadTier)[keyof typeof LeadTier],
-    row.latestScoreId ?? "legacy",
-    row.capturedAt,
-  );
-  return new Lead({
-    id: row.id,
-    code: LeadCode.parse(row.leadCode),
-    personType: row.personType as (typeof LeadPersonType)[keyof typeof LeadPersonType],
-    donorSubtype: (row.donorSubType as LeadDonorSubType | null) ?? null,
-    contact: new ContactInfo(
-      row.fullName,
-      row.phone,
-      row.email,
-      row.city,
-      row.state,
-      row.pincode,
-      row.preferredLanguage,
-    ),
-    consent: new Consent(
-      row.consentMarketing,
-      row.consentScreening,
-      row.consentDataProcessing,
-      row.consentVersion,
-      row.consentIp,
-      row.consentUserAgent,
-    ),
-    status: row.status as (typeof LeadStatus)[keyof typeof LeadStatus],
-    outcome: (row.outcome as (typeof LeadOutcome)[keyof typeof LeadOutcome] | null) ?? null,
-    isArchived: row.isArchived,
-    archive,
-    source: row.source as (typeof LeadSource)[keyof typeof LeadSource],
-    latestScore,
-    latestScoreId: row.latestScoreId,
-    ownership: {
-      siteId: row.assignedTelecaller?.siteId ?? null,
-      assignedTelecallerId: row.assignedTelecallerId,
-      activeAssignmentId: row.activeAssignmentId,
-    },
-    retention: {
-      capturedAt: row.capturedAt,
-      retentionExpiresAt: row.retentionExpiresAt,
-    },
-    merge: { mergedIntoLeadId: row.mergedIntoLeadId },
-    conversion: {
-      convertedDonorId: row.convertedDonorId,
-      convertedRecipientId: row.convertedRecipientId,
-      convertedAt: row.convertedAt,
-    },
-    duplicate: { duplicateOfLeadId: row.duplicateOfLeadId },
-    version: row.version,
-  });
+  return leadToDomain(row);
 }
 
 export class PrismaLeadRepository implements LeadRepository {
@@ -279,41 +223,47 @@ export async function runLeadWriteTransaction<T>(
 export async function appendActivity(
   tx: Prisma.TransactionClient,
   data: Prisma.LeadActivityCreateInput,
-) {
-  return tx.leadActivity.create({ data });
+): Promise<LeadActivity> {
+  const row = await tx.leadActivity.create({ data });
+  return activityToDomain(row);
 }
 
 export async function appendStatusHistory(
   tx: Prisma.TransactionClient,
   data: Prisma.LeadStatusHistoryCreateInput,
-) {
-  return tx.leadStatusHistory.create({ data });
+): Promise<LeadStatusHistory> {
+  const row = await tx.leadStatusHistory.create({ data });
+  return statusHistoryToDomain(row);
 }
 
 export async function appendAssignment(
   tx: Prisma.TransactionClient,
   data: Prisma.LeadAssignmentCreateInput,
-) {
-  return tx.leadAssignment.create({ data });
+): Promise<LeadAssignment> {
+  const row = await tx.leadAssignment.create({ data });
+  return assignmentToDomain(row);
 }
 
 export async function appendScore(
   tx: Prisma.TransactionClient,
   data: Prisma.LeadScoreCreateInput,
-) {
-  return tx.leadScore.create({ data });
+): Promise<LeadScore> {
+  const row = await tx.leadScore.create({ data });
+  return scoreToDomain(row);
 }
 
 export async function appendFollowUp(
   tx: Prisma.TransactionClient,
   data: Prisma.LeadFollowUpCreateInput,
-) {
-  return tx.leadFollowUp.create({ data });
+): Promise<LeadFollowUp> {
+  const row = await tx.leadFollowUp.create({ data });
+  return followUpToDomain(row);
 }
 
 export async function appendOutboxEvent(
   tx: Prisma.TransactionClient,
   data: Prisma.LeadOutboxEventCreateInput,
-) {
-  return tx.leadOutboxEvent.create({ data });
+): Promise<LeadOutboxEvent> {
+  const row = await tx.leadOutboxEvent.create({ data });
+  return outboxEventToDomain(row);
 }

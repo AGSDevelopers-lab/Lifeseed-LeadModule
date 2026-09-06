@@ -27,6 +27,13 @@ import {
   LEAD_INTERACTIVE_TX_OPTIONS,
   prismaLeadRepository,
 } from "./prisma-lead-repository";
+import { leadToDomain } from "./mappers/lead-mapper";
+import { activityToDomain } from "./mappers/activity-mapper";
+import { statusHistoryToDomain } from "./mappers/status-history-mapper";
+import { outboxEventToDomain } from "./mappers/outbox-event-mapper";
+import { assignmentToDomain } from "./mappers/assignment-mapper";
+import { scoreToDomain } from "./mappers/score-mapper";
+import { followUpToDomain } from "./mappers/follow-up-mapper";
 import type { TransitionStore } from "../application/__apply-transition";
 
 type Tx = Omit<
@@ -67,6 +74,7 @@ async function appendStatusHistory(
       occurredAt: now,
     },
   });
+  statusHistoryToDomain(row);
   return row.id;
 }
 
@@ -91,6 +99,7 @@ async function appendActivity(
       metadata: write.metadata as Prisma.InputJsonValue | undefined,
     },
   });
+  activityToDomain(row);
   return row.id;
 }
 
@@ -112,6 +121,7 @@ async function appendOutboxEvent(
       dispatchStatus: DispatchStatus.PENDING,
     },
   });
+  outboxEventToDomain(row);
   return row.id;
 }
 
@@ -207,6 +217,7 @@ export class PrismaLeadTransitionStore implements TransitionStore {
                 siteId: write.siteId,
               },
             });
+            assignmentToDomain(created);
             await tx.lead.update({
               where: { id: leadId },
               data: { activeAssignmentId: created.id, assignedTelecallerId: write.assigneeUserId, assignedAt: input.now },
@@ -226,6 +237,7 @@ export class PrismaLeadTransitionStore implements TransitionStore {
                 computedAt: input.now,
               },
             });
+            scoreToDomain(score);
             await tx.lead.update({
               where: { id: leadId },
               data: { latestScoreId: score.id, latestScoreValue: write.score },
@@ -254,7 +266,7 @@ export class PrismaLeadTransitionStore implements TransitionStore {
                 dueAt: write.dueAt,
                 status: FollowUpStatus.OPEN,
               },
-            });
+            }).then(followUpToDomain);
             break;
           }
           case "call_record": {
@@ -432,8 +444,13 @@ export class PrismaLeadTransitionStore implements TransitionStore {
         orderBy: { occurredAt: "desc" },
       });
       const lead = await tx.lead.findUniqueOrThrow({ where: { id: leadId } });
+      const domainLead = leadToDomain({
+        ...lead,
+        counsellingBooking: null,
+        assignedTelecaller: null,
+      });
       return {
-        status: lead.status,
+        status: domainLead.status,
         latestHistoryToStatus: history?.toStatus ?? latestHistoryToStatus,
       };
     }, LEAD_INTERACTIVE_TX_OPTIONS);
