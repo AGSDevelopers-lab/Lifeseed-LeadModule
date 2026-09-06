@@ -20,3 +20,13 @@ export function stateMachinePersistsSideEffects(mode: LeadStateMachineMode): boo
 export function legacyDirectStatusWritesThrow(mode: LeadStateMachineMode): boolean {
   return mode === "strict";
 }
+
+export type LeadOutboxMode = "off" | "on";
+
+/** Dispatcher only. Outbox rows still accumulate when off (no data loss). */
+export function isLeadOutboxEnabled(env?: {
+  LEAD_OUTBOX_ENABLED?: string;
+}): boolean {
+  const flag = env?.LEAD_OUTBOX_ENABLED ?? process.env.LEAD_OUTBOX_ENABLED;
+  return flag === "on";
+}

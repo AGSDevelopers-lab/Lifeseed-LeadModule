@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/leads/v2/internal/outbox/dispatch",
+      "schedule": "* * * * *"
+    }
+  ]
+}

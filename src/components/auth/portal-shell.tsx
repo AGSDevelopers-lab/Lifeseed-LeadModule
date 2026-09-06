@@ -68,6 +68,7 @@ const NAV: Record<PortalKind, NavItem[]> = {
       children: [
         { href: "/admin/leads", label: "All Leads" },
         { href: "/admin/leads/analytics", label: "Analytics" },
+        { href: "/admin/leads/crm", label: "CRM sync" },
         { href: "/admin/leads/do-not-call", label: "Do Not Call" },
       ],
     },

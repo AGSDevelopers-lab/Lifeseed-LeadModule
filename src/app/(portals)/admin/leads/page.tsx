@@ -94,6 +94,9 @@ export default async function AdminLeadsPage({
           <Link href="/admin/leads/analytics" className="text-emerald-900 hover:underline">
             Analytics
           </Link>
+          <Link href="/admin/leads/crm" className="text-emerald-900 hover:underline">
+            CRM sync
+          </Link>
           <Link href="/admin/leads/do-not-call" className="text-emerald-900 hover:underline">
             Do Not Call
           </Link>
