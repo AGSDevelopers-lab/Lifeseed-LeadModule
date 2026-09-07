@@ -37,6 +37,7 @@ describe("HisConversionAdapter eligibility", () => {
       phone: null,
       email: null,
       doNotCallFlag: false,
+      consentDataProcessing: true,
       convertedDonorId: null,
       convertedRecipientId: null,
     } as never);
@@ -55,6 +56,7 @@ describe("HisConversionAdapter eligibility", () => {
       phone: "9999999999",
       email: "a@b.c",
       doNotCallFlag: true,
+      consentDataProcessing: true,
       convertedDonorId: null,
       convertedRecipientId: null,
     } as never);
@@ -73,6 +75,7 @@ describe("HisConversionAdapter eligibility", () => {
       phone: "9999999999",
       email: "a@b.c",
       doNotCallFlag: false,
+      consentDataProcessing: true,
       convertedDonorId: "d1",
       convertedRecipientId: null,
     } as never);
@@ -82,4 +85,26 @@ describe("HisConversionAdapter eligibility", () => {
     expect(result.eligible).toBe(false);
     expect(result.reasons).toContain("Existing conversion");
   });
+
+  it("missing data-processing consent → not eligible", async () => {
+    const db = mockDb();
+    vi.mocked(db.lead.findUnique).mockResolvedValue({
+      id: "l1",
+      personType: LeadPersonType.DONOR,
+      fullName: "A",
+      phone: "9999999999",
+      email: "a@b.c",
+      doNotCallFlag: false,
+      consentDataProcessing: false,
+      convertedDonorId: null,
+      convertedRecipientId: null,
+    } as never);
+    const adapter = new HisConversionAdapter(db as never);
+    const result = await adapter.isEligibleForDonor("l1");
+    expect(result.eligible).toBe(false);
+    expect(result.reasons).toContain("Consent not captured");
+  });
+
+  // ART Act living-child / marital / spouse-consent checks are intentionally
+  // absent: Donor Pathway P0_INTAKE → P1_STAGE_1 is authoritative.
 });

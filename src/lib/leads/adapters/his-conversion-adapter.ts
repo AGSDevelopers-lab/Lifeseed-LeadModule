@@ -27,6 +27,7 @@ type LeadRow = {
   pincode: string | null;
   donorSubType: string | null;
   doNotCallFlag: boolean;
+  consentDataProcessing: boolean;
   convertedDonorId: string | null;
   convertedRecipientId: string | null;
 };
@@ -125,9 +126,8 @@ export class HisConversionAdapter implements ConversionPort {
     }
 
     const type = lead.donorSubType === "OOCYTE" ? DonorType.OOCYTE : DonorType.SEMEN;
-    if (type === DonorType.OOCYTE && extras.hasLivingChild !== true) {
-      return { ok: false, error: "Oocyte donors must have at least one living child (ART Act)." };
-    }
+    // ART Act eligibility (living child, marital status, spouse consent, serology, etc.)
+    // is NOT enforced here. Donor Pathway owns the P0_INTAKE → P1_STAGE_1 gate.
 
     const site = await db.site.findUnique({ where: { id: extras.siteId } });
     if (!site) return { ok: false, error: "Site not found" };
@@ -229,6 +229,7 @@ export class HisConversionAdapter implements ConversionPort {
 
     if (!lead.fullName) reasons.push("Missing fullName");
     if (!lead.phone) reasons.push("Missing phone");
+    if (!lead.consentDataProcessing) reasons.push("Consent not captured");
 
     if (target === "DONOR") {
       if (lead.personType !== LeadPersonType.DONOR) reasons.push("Lead is not a donor lead");

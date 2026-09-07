@@ -12,6 +12,8 @@ export class FakeConversionPort implements ConversionPort {
   createdDonorIds: string[] = [];
   createdRecipientIds: string[] = [];
   throwOnConvert = false;
+  // Lead-level only (identity / DNC / prior conversion / consent). ART Act
+  // checks live on Donor Pathway P0→P1, not ConversionPort.
   donorEligibility: EligibilityResult = { eligible: true, reasons: [] };
   recipientEligibility: EligibilityResult = { eligible: true, reasons: [] };
 
