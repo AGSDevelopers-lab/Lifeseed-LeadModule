@@ -22,7 +22,7 @@ import { prisma } from "@/lib/db";
 import type { Lead } from "../domain/entities/Lead";
 import type { ActorContext } from "../domain/ports/shared";
 import type { DomainWrite } from "../domain/state-machine/types";
-import { LeadInvariantViolationError } from "../domain/errors";
+import { LeadDuplicateConversionError, LeadInvariantViolationError } from "../domain/errors";
 import {
   LEAD_INTERACTIVE_TX_OPTIONS,
   prismaLeadRepository,
@@ -141,7 +141,24 @@ export class PrismaLeadTransitionStore implements TransitionStore {
     now: Date;
     throwAfterWrites?: boolean;
   }): Promise<{ status: string; latestHistoryToStatus: string | null }> {
-    return this.db.$transaction(async (tx) => {
+    return this.db.$transaction(
+      (tx) => this.persistBundleWithClient(tx as never, input),
+      LEAD_INTERACTIVE_TX_OPTIONS,
+    );
+  }
+
+  async persistBundleWithClient(
+    tx: Tx,
+    input: {
+      lead: Lead;
+      nextStatus: string;
+      writes: DomainWrite[];
+      actorUserId: string;
+      actorRole: string | null;
+      now: Date;
+      throwAfterWrites?: boolean;
+    },
+  ): Promise<{ status: string; latestHistoryToStatus: string | null }> {
       const leadId = input.lead.id;
       let patch: Prisma.LeadUncheckedUpdateInput = {
         status: input.nextStatus as LeadStatus,
@@ -165,6 +182,8 @@ export class PrismaLeadTransitionStore implements TransitionStore {
             convertedRecipientId:
               p.convertedRecipientId === undefined ? patch.convertedRecipientId : p.convertedRecipientId,
             convertedAt: p.convertedAt === undefined ? patch.convertedAt : p.convertedAt,
+            convertedByUserId:
+              p.convertedByUserId === undefined ? patch.convertedByUserId : p.convertedByUserId,
             mergedIntoLeadId: p.mergedIntoLeadId === undefined ? patch.mergedIntoLeadId : p.mergedIntoLeadId,
             redactedAt: p.redactedAt === undefined ? patch.redactedAt : p.redactedAt,
             redactionReason: p.redactionReason === undefined ? patch.redactionReason : p.redactionReason,
@@ -388,7 +407,36 @@ export class PrismaLeadTransitionStore implements TransitionStore {
             }
             break;
           }
-          case "conversion_stub":
+          case "conversion_stub": {
+            if (!write.targetEntityId) break;
+            try {
+              await tx.leadConversion.create({
+                data: {
+                  leadId,
+                  targetType: write.target,
+                  targetEntityId: write.targetEntityId,
+                  decidedByUserId: write.decidedByUserId ?? input.actorUserId,
+                  eligibilitySnapshot: (write.eligibilitySnapshot ?? {}) as Prisma.InputJsonValue,
+                  occurredAt: input.now,
+                  notes: write.notes ?? null,
+                },
+              });
+            } catch (err) {
+              if (
+                typeof err === "object" &&
+                err &&
+                "code" in err &&
+                (err as { code: string }).code === "P2002"
+              ) {
+                throw new LeadDuplicateConversionError("Lead already converted", {
+                  leadId,
+                  code: "DUPLICATE_CONVERSION",
+                });
+              }
+              throw err;
+            }
+            break;
+          }
           case "merge_stub":
             break;
           case "redact_pii":
@@ -453,7 +501,6 @@ export class PrismaLeadTransitionStore implements TransitionStore {
         status: domainLead.status,
         latestHistoryToStatus: history?.toStatus ?? latestHistoryToStatus,
       };
-    }, LEAD_INTERACTIVE_TX_OPTIONS);
   }
 }
 

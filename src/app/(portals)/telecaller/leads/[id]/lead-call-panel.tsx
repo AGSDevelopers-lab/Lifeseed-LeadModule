@@ -5,11 +5,7 @@ import { useState } from "react";
 import { CallDispositionType, LeadPersonType } from "@prisma/client";
 import { toast } from "sonner";
 
-import {
-  convertDonorAction,
-  convertRecipientAction,
-  saveDisposition,
-} from "@/app/(portals)/leads/actions";
+import { saveDisposition } from "@/app/(portals)/leads/actions";
 import { Button, Input, Label } from "@/components/ui/primitives";
 
 /** Mutations go through server actions → application/qualify (never Prisma status writes). */
@@ -66,16 +62,25 @@ export function LeadCallPanel({
 
   async function onConvertDonor() {
     setPending(true);
-    const result = await convertDonorAction(leadId, {
-      dob,
-      gender,
-      siteId,
-      preferredIntakeAt: preferredIntakeAt || undefined,
-      coordinatorUserId: coordinatorUserId || undefined,
+    const res = await fetch(`/api/leads/v2/leads/${leadId}/convert/donor`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        dob,
+        gender,
+        siteId,
+        preferredIntakeAt: preferredIntakeAt || undefined,
+        coordinatorUserId: coordinatorUserId || undefined,
+      }),
     });
+    const payload = (await res.json()) as {
+      ok?: boolean;
+      donorId?: string;
+      error?: { message?: string };
+    };
     setPending(false);
-    if (!result.ok) {
-      toast.error(result.error);
+    if (!res.ok || !payload.ok) {
+      toast.error(payload.error?.message ?? "Convert failed");
       return;
     }
     toast.success("Converted to donor (P0 Intake — Aadhaar at screening)");
@@ -84,10 +89,18 @@ export function LeadCallPanel({
 
   async function onConvertRecipient() {
     setPending(true);
-    const result = await convertRecipientAction(leadId, clinicId);
+    const res = await fetch(`/api/leads/v2/leads/${leadId}/convert/recipient`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clinicId }),
+    });
+    const payload = (await res.json()) as {
+      ok?: boolean;
+      error?: { message?: string };
+    };
     setPending(false);
-    if (!result.ok) {
-      toast.error(result.error);
+    if (!res.ok || !payload.ok) {
+      toast.error(payload.error?.message ?? "Convert failed");
       return;
     }
     toast.success("Converted to recipient");

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { getLeadStateMachineMode, isLeadOutboxEnabled } from "./feature-flag";
+import { getLeadStateMachineMode, isLeadConversionPortEnabled, isLeadOutboxEnabled } from "./feature-flag";
 
 const env = { ...process.env };
 afterEach(() => {
@@ -26,5 +26,17 @@ describe("LEAD_OUTBOX_ENABLED", () => {
     expect(isLeadOutboxEnabled({ LEAD_OUTBOX_ENABLED: "off" })).toBe(false);
     expect(isLeadOutboxEnabled({ LEAD_OUTBOX_ENABLED: "ON" })).toBe(false);
     expect(isLeadOutboxEnabled({ LEAD_OUTBOX_ENABLED: "on" })).toBe(true);
+  });
+});
+
+describe("LEAD_CONVERSION_PORT_ENABLED", () => {
+  it("defaults to off in production", () => {
+    delete process.env.LEAD_CONVERSION_PORT_ENABLED;
+    expect(isLeadConversionPortEnabled({ NODE_ENV: "production" })).toBe(false);
+  });
+
+  it("defaults to on outside production", () => {
+    delete process.env.LEAD_CONVERSION_PORT_ENABLED;
+    expect(isLeadConversionPortEnabled({ NODE_ENV: "development" })).toBe(true);
   });
 });

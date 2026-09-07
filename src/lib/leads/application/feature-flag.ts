@@ -30,3 +30,21 @@ export function isLeadOutboxEnabled(env?: {
   const flag = env?.LEAD_OUTBOX_ENABLED ?? process.env.LEAD_OUTBOX_ENABLED;
   return flag === "on";
 }
+
+export type LeadConversionPortMode = "off" | "on";
+
+/**
+ * Default `off` in production (legacy convert path).
+ * Default `on` in non-production for shadow testing.
+ */
+export function isLeadConversionPortEnabled(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  const raw = env.LEAD_CONVERSION_PORT_ENABLED;
+  if (raw === "on") return true;
+  if (raw === "off") return false;
+  if (env.VERCEL_ENV === "production" || env.NODE_ENV === "production") {
+    return false;
+  }
+  return true;
+}

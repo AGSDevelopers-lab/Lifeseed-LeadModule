@@ -12,6 +12,7 @@ import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { applyAuthorizedLeadStatus } from "@/lib/leads/adapters/prisma-lead-repository";
 import { markCompletedByEntity } from "@/lib/sla/engine";
+import { isLeadConversionPortEnabled } from "@/lib/leads/application/feature-flag";
 
 export type DonorConvertExtras = {
   dob: string;
@@ -35,6 +36,29 @@ export type DonorConvertExtras = {
  * Aadhaar is optional here — collected later at P1 with STAGE_2 consent.
  */
 export async function convertLeadToDonor(
+  leadId: string,
+  actorId: string,
+  extras: DonorConvertExtras,
+  options: { skipStatusWrite?: boolean } = {},
+): Promise<{ ok: true; donorId: string } | { ok: false; error: string }> {
+  if (isLeadConversionPortEnabled()) {
+    const { convertDonor } = await import("@/lib/leads/application/convert");
+    const result = await convertDonor(leadId, { userId: actorId, roles: ["OPS_MANAGER"] }, extras);
+    if (result.ok && result.donorId) return { ok: true, donorId: result.donorId };
+    if (!result.ok) return { ok: false, error: result.error };
+    return { ok: false, error: "Conversion failed" };
+  }
+  console.warn(
+    JSON.stringify({
+      msg: "lead_conversion_legacy_path_deprecated",
+      path: "convertLeadToDonor",
+      leadId,
+    }),
+  );
+  return convertLeadToDonorLegacy(leadId, actorId, extras, options);
+}
+
+async function convertLeadToDonorLegacy(
   leadId: string,
   actorId: string,
   extras: DonorConvertExtras,
@@ -174,6 +198,29 @@ export type RecipientConvertInput = {
  * Convert RECIPIENT lead → Recipient (existing model + sourceLeadId).
  */
 export async function convertLeadToRecipient(
+  leadId: string,
+  actorId: string,
+  input: RecipientConvertInput,
+  options: { skipStatusWrite?: boolean } = {},
+): Promise<{ ok: true; recipientId: string } | { ok: false; error: string }> {
+  if (isLeadConversionPortEnabled()) {
+    const { convertRecipient } = await import("@/lib/leads/application/convert");
+    const result = await convertRecipient(leadId, { userId: actorId, roles: ["OPS_MANAGER"] }, input);
+    if (result.ok && result.recipientId) return { ok: true, recipientId: result.recipientId };
+    if (!result.ok) return { ok: false, error: result.error };
+    return { ok: false, error: "Conversion failed" };
+  }
+  console.warn(
+    JSON.stringify({
+      msg: "lead_conversion_legacy_path_deprecated",
+      path: "convertLeadToRecipient",
+      leadId,
+    }),
+  );
+  return convertLeadToRecipientLegacy(leadId, actorId, input, options);
+}
+
+async function convertLeadToRecipientLegacy(
   leadId: string,
   actorId: string,
   input: RecipientConvertInput,

@@ -32,6 +32,7 @@ export type LeadPatch = {
   convertedDonorId?: string | null;
   convertedRecipientId?: string | null;
   convertedAt?: Date | null;
+  convertedByUserId?: string | null;
   mergedIntoLeadId?: string | null;
   redactedAt?: Date | null;
   redactionReason?: string | null;
@@ -120,7 +121,14 @@ export type DomainWrite =
       recommendation: string;
       rationale?: string | null;
     }
-  | { kind: "conversion_stub"; target: "DONOR" | "RECIPIENT" }
+  | {
+      kind: "conversion_stub";
+      target: "DONOR" | "RECIPIENT";
+      targetEntityId?: string;
+      eligibilitySnapshot?: Record<string, unknown>;
+      decidedByUserId?: string;
+      notes?: string | null;
+    }
   | { kind: "merge_stub"; winnerLeadId: string }
   | { kind: "redact_pii" }
   | { kind: "attribution_first"; source: string };

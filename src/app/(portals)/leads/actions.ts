@@ -22,10 +22,6 @@ import {
   getLeadStateMachineMode,
   stateMachinePersistsSideEffects,
 } from "@/lib/leads/application/feature-flag";
-import {
-  convertLeadToDonor,
-  convertLeadToRecipient,
-} from "@/lib/leads/lead-conversion";
 import { assignLead } from "@/lib/leads/lead-assignment";
 import { requirePermission } from "@/lib/rbac";
 import { scheduleSla } from "@/lib/sla/engine";
@@ -340,21 +336,14 @@ export async function convertDonorAction(
   },
 ): Promise<ActionResult> {
   try {
-    const session = await requirePermission("lead.convert");
+    await requirePermission("lead.convert");
     await requirePermission("donor.create");
     const actor = await requireReadableLead(leadId);
-    if (stateMachinePersistsSideEffects(getLeadStateMachineMode())) {
-      const result = await (await import("@/lib/leads/application/convert")).convertDonor(
-        leadId,
-        actor,
-        extras,
-      );
-      if (!result.ok) return result;
-      revalidatePath(`/telecaller/leads/${leadId}`);
-      revalidatePath("/admin/donors");
-      return { ok: true, id: result.donorId };
-    }
-    const result = await convertLeadToDonor(leadId, session.userId, extras);
+    const result = await (await import("@/lib/leads/application/convert")).convertDonor(
+      leadId,
+      actor,
+      extras,
+    );
     if (!result.ok) return result;
     revalidatePath(`/telecaller/leads/${leadId}`);
     revalidatePath("/admin/donors");
@@ -369,11 +358,13 @@ export async function convertRecipientAction(
   clinicId: string,
 ): Promise<ActionResult> {
   try {
-    const session = await requirePermission("lead.convert");
-    await requireReadableLead(leadId);
-    const result = await convertLeadToRecipient(leadId, session.userId, {
-      clinicId,
-    });
+    await requirePermission("lead.convert");
+    const actor = await requireReadableLead(leadId);
+    const result = await (await import("@/lib/leads/application/convert")).convertRecipient(
+      leadId,
+      actor,
+      { clinicId },
+    );
     if (!result.ok) return result;
     revalidatePath(`/telecaller/leads/${leadId}`);
     return { ok: true, id: result.recipientId };
