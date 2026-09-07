@@ -4,7 +4,6 @@ import {
   CallDispositionType,
   CounsellingBookingStatus,
   CounsellingMode,
-  DncSource,
   LeadStatus,
   LeadTier,
   SlaEntityType,
@@ -13,6 +12,8 @@ import {
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { addDncFromLeadContact } from "@/lib/leads/application/dnc";
+import { DncChannel } from "@/lib/leads/domain/enums";
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { resolveLeadActor } from "@/lib/leads/adapters/identity-adapter";
@@ -149,16 +150,12 @@ export async function saveDisposition(
     if (d.disposition === CallDispositionType.DO_NOT_CALL) {
       const lead = await prisma.lead.findUnique({ where: { id: d.leadId } });
       if (lead?.phone) {
-        await prisma.leadDoNotCallList.upsert({
-          where: { phone: lead.phone },
-          create: {
-            phone: lead.phone,
-            email: lead.email,
-            reason: d.notes ?? "Disposition DO_NOT_CALL",
-            addedByUserId: session.userId,
-            source: DncSource.OPS_ADD,
-          },
-          update: { reason: d.notes ?? "Disposition DO_NOT_CALL" },
+        await addDncFromLeadContact({
+          phone: lead.phone,
+          email: lead.email,
+          reason: d.notes ?? "Disposition DO_NOT_CALL",
+          createdByUserId: session.userId,
+          sourceLeadId: d.leadId,
         });
       }
     }
@@ -380,30 +377,19 @@ export async function addToDnc(input: {
 }): Promise<ActionResult> {
   try {
     const session = await requirePermission("dnc.add");
-    const row = await prisma.leadDoNotCallList.upsert({
-      where: { phone: input.phone },
-      create: {
-        phone: input.phone,
-        email: input.email ?? null,
-        reason: input.reason,
-        addedByUserId: session.userId,
-        source: DncSource.OPS_ADD,
-      },
-      update: {
-        reason: input.reason,
-        email: input.email ?? undefined,
-      },
+    const rows = await addDncFromLeadContact({
+      phone: input.phone,
+      email: input.email ?? null,
+      reason: input.reason,
+      createdByUserId: session.userId,
     });
-    await prisma.lead.updateMany({
-      where: { phone: input.phone },
-      data: { doNotCallFlag: true },
-    });
+    const row = rows[0];
     await audit.log({
       actorUserId: session.userId,
       action: "dnc.add",
-      entityType: "LeadDoNotCallList",
+      entityType: "LeadDoNotCall",
       entityId: row.id,
-      afterJson: { phone: input.phone },
+      afterJson: { phone: input.phone, channel: DncChannel.PHONE },
     });
     revalidatePath("/telecaller/do-not-call");
     revalidatePath("/admin/leads/do-not-call");

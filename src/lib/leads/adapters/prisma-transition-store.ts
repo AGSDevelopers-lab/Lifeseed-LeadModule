@@ -5,7 +5,6 @@ import {
   CallDispositionType,
   CounsellingBookingStatus,
   DispatchStatus,
-  DncSource,
   FollowUpPriority,
   FollowUpStatus,
   LeadActivityType,
@@ -33,6 +32,7 @@ import { statusHistoryToDomain } from "./mappers/status-history-mapper";
 import { outboxEventToDomain } from "./mappers/outbox-event-mapper";
 import { assignmentToDomain } from "./mappers/assignment-mapper";
 import { scoreToDomain } from "./mappers/score-mapper";
+import { addDncFromLeadContact } from "../application/dnc";
 import { followUpToDomain } from "./mappers/follow-up-mapper";
 import type { TransitionStore } from "../application/__apply-transition";
 
@@ -313,17 +313,16 @@ export class PrismaLeadTransitionStore implements TransitionStore {
           case "dnc_add": {
             const row = await tx.lead.findUnique({ where: { id: leadId }, select: { phone: true, email: true } });
             if (row?.phone) {
-              await tx.leadDoNotCallList.upsert({
-                where: { phone: row.phone },
-                create: {
+              await addDncFromLeadContact(
+                {
                   phone: row.phone,
                   email: row.email,
                   reason: write.reason,
-                  addedByUserId: input.actorUserId,
-                  source: DncSource.OPS_ADD,
+                  createdByUserId: input.actorUserId,
+                  sourceLeadId: leadId,
                 },
-                update: { reason: write.reason },
-              });
+                tx as never,
+              );
             }
             break;
           }

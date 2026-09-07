@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { getLeadStateMachineMode, isLeadConversionPortEnabled, isLeadOutboxEnabled } from "./feature-flag";
+import { getLeadStateMachineMode, getLeadNotificationPortMode, isLeadConversionPortEnabled, isLeadOutboxEnabled } from "./feature-flag";
 
 const env = { ...process.env };
 afterEach(() => {
@@ -38,5 +38,17 @@ describe("LEAD_CONVERSION_PORT_ENABLED", () => {
   it("defaults to on outside production", () => {
     delete process.env.LEAD_CONVERSION_PORT_ENABLED;
     expect(isLeadConversionPortEnabled({ NODE_ENV: "development" })).toBe(true);
+  });
+});
+
+describe("LEAD_NOTIFICATION_PORT_ENABLED", () => {
+  it("defaults to in_app_only", () => {
+    delete process.env.LEAD_NOTIFICATION_PORT_ENABLED;
+    expect(getLeadNotificationPortMode({})).toBe("in_app_only");
+  });
+
+  it("accepts off | in_app_only | on", () => {
+    expect(getLeadNotificationPortMode({ LEAD_NOTIFICATION_PORT_ENABLED: "off" })).toBe("off");
+    expect(getLeadNotificationPortMode({ LEAD_NOTIFICATION_PORT_ENABLED: "on" })).toBe("on");
   });
 });

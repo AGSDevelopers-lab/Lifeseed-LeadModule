@@ -1,26 +1,14 @@
 import type {
   NotificationPort,
   NotificationSendInput,
+  NotificationSendResult,
 } from "../domain/ports/NotificationPort";
+import { createPrismaNotificationPort } from "./notification/notification-port";
 
-/** B06 stub: in-app only. Real email/SMS/WhatsApp adapters land in B12. */
+/** B06 entry point — now delegates to the B08 DNC-gated port. */
 export class InAppNotificationPort implements NotificationPort {
-  async send(input: NotificationSendInput): Promise<{ deliveryId: string }> {
-    console.info(
-      JSON.stringify({
-        msg: "lead_in_app_notification_enqueued",
-        channel: input.channel,
-        templateKey: input.templateKey,
-        recipient: input.recipient,
-        leadId: input.leadId ?? null,
-        outboxEventId:
-          typeof input.data.outboxEventId === "string" ? input.data.outboxEventId : null,
-      }),
-    );
-    const id =
-      typeof input.data.outboxEventId === "string"
-        ? `in-app-${input.data.outboxEventId}`
-        : `in-app-${input.templateKey}`;
-    return { deliveryId: id };
+  async send(input: NotificationSendInput): Promise<NotificationSendResult> {
+    const port = await createPrismaNotificationPort();
+    return port.send(input);
   }
 }

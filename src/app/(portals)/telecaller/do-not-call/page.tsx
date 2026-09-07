@@ -1,6 +1,10 @@
 import { redirect } from "next/navigation";
 
-import { DncForm } from "@/app/(portals)/telecaller/do-not-call/dnc-form";
+import {
+  DncForm,
+  DncRemoveButton,
+  formatWhen,
+} from "@/app/(portals)/telecaller/do-not-call/dnc-form";
 import {
   Table,
   TableBody,
@@ -23,7 +27,8 @@ export default async function DoNotCallPage() {
     redirect("/telecaller/dashboard");
   }
 
-  const rows = await prisma.leadDoNotCallList.findMany({
+  const rows = await prisma.leadDoNotCall.findMany({
+    where: { removedAt: null },
     orderBy: { addedAt: "desc" },
     take: 100,
   });
@@ -32,30 +37,46 @@ export default async function DoNotCallPage() {
     permissionsForRoles(session.roles),
     "dnc.add",
   );
+  const canRemove = permissionGranted(
+    permissionsForRoles(session.roles),
+    "dnc.remove",
+  );
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Do Not Call</h1>
-      {canAdd && <DncForm />}
+      {canAdd && <DncForm canRemove={canRemove} />}
       <div className="rounded-xl border border-stone-200 bg-white">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Phone</TableHead>
+              <TableHead>Channel</TableHead>
+              <TableHead>Value</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Reason</TableHead>
-              <TableHead>Added</TableHead>
+              <TableHead>Source</TableHead>
+              <TableHead>From</TableHead>
+              <TableHead>Until</TableHead>
+              <TableHead>Removal authority</TableHead>
+              {canRemove ? <TableHead /> : null}
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.map((r) => (
               <TableRow key={r.id}>
-                <TableCell>{r.phone}</TableCell>
+                <TableCell className="text-xs">{r.channel}</TableCell>
+                <TableCell>{r.normalisedValue}</TableCell>
                 <TableCell className="text-xs">{r.email ?? "—"}</TableCell>
                 <TableCell className="text-xs">{r.reason}</TableCell>
-                <TableCell className="text-xs">
-                  {r.addedAt.toISOString().slice(0, 10)}
-                </TableCell>
+                <TableCell className="text-xs">{r.source}</TableCell>
+                <TableCell className="text-xs">{formatWhen(r.effectiveFrom)}</TableCell>
+                <TableCell className="text-xs">{formatWhen(r.effectiveUntil)}</TableCell>
+                <TableCell className="text-xs">{r.removalAuthorityUserId ?? "—"}</TableCell>
+                {canRemove ? (
+                  <TableCell>
+                    <DncRemoveButton id={r.id} />
+                  </TableCell>
+                ) : null}
               </TableRow>
             ))}
           </TableBody>

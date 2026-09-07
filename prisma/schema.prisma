@@ -109,7 +109,8 @@ model User {
   callDispositions CallDisposition[] @relation("CallDispositionTelecaller")
   counsellingSessions CounsellingBooking[] @relation("CounsellingCounsellor")
   cancelledBookings CounsellingBooking[] @relation("CounsellingCancelledBy")
-  dncEntries LeadDoNotCallList[] @relation("DncAddedBy")
+  dncEntries LeadDoNotCall[] @relation("DncAddedBy")
+  dncRemovalsAuthorized LeadDoNotCall[] @relation("DncRemovalAuthority")
   leadActivities LeadActivity[] @relation("LeadActivityActor")
   leadStatusHistories LeadStatusHistory[] @relation("LeadStatusHistoryActor")
   leadScoresComputed LeadScore[] @relation("LeadScoreComputedBy")
@@ -1892,6 +1893,8 @@ model Lead {
   mergesAsLoser        LeadMerge[]          @relation("LeadMergeLoser")
   conversionRecord     LeadConversion?
   notificationLogs     NotificationDeliveryLog[]
+  dncSourceEntries     LeadDoNotCall[]
+  inAppNotifications   NotificationInApp[]
 
   @@index([status])
   @@index([tier])
@@ -2028,18 +2031,36 @@ model CrmSyncQueue {
   @@index([entityType, entityId])
 }
 
-model LeadDoNotCallList {
-  id          String    @id @default(cuid())
-  phone       String    @unique
-  email       String?
-  reason      String
-  addedByUserId String?
-  addedBy     User?     @relation("DncAddedBy", fields: [addedByUserId], references: [id])
-  addedAt     DateTime  @default(now())
-  expiresAt   DateTime?
-  source      DncSource @default(OPS_ADD)
+model LeadDoNotCall {
+  id                       String      @id @default(cuid())
+  /// Legacy columns retained for the LeadDoNotCallList compatibility view.
+  phone                    String
+  email                    String?
+  reason                   String
+  addedByUserId            String?
+  addedBy                  User?       @relation("DncAddedBy", fields: [addedByUserId], references: [id])
+  addedAt                  DateTime    @default(now())
+  expiresAt                DateTime?
+  source                   DncSource   @default(MANUAL)
+  channel                  DncChannel
+  value                    String
+  normalisedValue          String
+  sourceLeadId             String?
+  sourceLead               Lead?       @relation(fields: [sourceLeadId], references: [id])
+  effectiveFrom            DateTime
+  effectiveUntil           DateTime?
+  createdByUserId          String
+  removalAuthorityUserId   String?
+  removalAuthority         User?       @relation("DncRemovalAuthority", fields: [removalAuthorityUserId], references: [id])
+  removedAt                DateTime?
+  removalNote              String?
+  createdAt                DateTime    @default(now())
+  updatedAt                DateTime    @updatedAt
 
   @@index([email])
+  @@index([normalisedValue])
+  @@index([effectiveUntil])
+  @@index([channel, normalisedValue])
 }
 
 model LeadActivity {
@@ -2429,6 +2450,22 @@ model NotificationTemplate {
 
   @@unique([key, channel, language, version])
   @@index([channel, isActive])
+}
+
+model NotificationInApp {
+  id               String    @id @default(cuid())
+  recipientUserId  String
+  title            String
+  body             String
+  leadId           String?
+  lead             Lead?     @relation(fields: [leadId], references: [id])
+  templateKey      String
+  payload          Json?
+  readAt           DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([recipientUserId, createdAt])
+  @@index([leadId])
 }
 
 model NotificationDeliveryLog {

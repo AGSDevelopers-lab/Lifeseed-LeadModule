@@ -14,6 +14,7 @@ import {
 } from "@/lib/leads/lead-assignment";
 import { allocateLeadCode } from "@/lib/leads/adapters/prisma-lead-code-generator";
 import { scoreLead } from "@/lib/leads/lead-scoring";
+import { isOnDoNotCallList } from "@/lib/leads/application/dnc";
 
 export type CreateLeadInput = {
   personType: LeadPersonType;
@@ -39,13 +40,7 @@ export type CreateLeadInput = {
   actorId?: string | null;
 };
 
-export async function isOnDoNotCallList(phone: string): Promise<boolean> {
-  const now = new Date();
-  const row = await prisma.leadDoNotCallList.findUnique({ where: { phone } });
-  if (!row) return false;
-  if (row.expiresAt && row.expiresAt < now) return false;
-  return true;
-}
+export { isOnDoNotCallList };
 
 /** Raw intake persist (T-01 row). Status omitted — Prisma default NEW. */
 export async function persistNewLead(input: CreateLeadInput) {

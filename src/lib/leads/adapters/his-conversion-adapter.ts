@@ -35,7 +35,9 @@ type LeadRow = {
 type ConversionDb = {
   lead: { findUnique: (args: { where: { id: string } }) => Promise<LeadRow | null> };
   leadConversion: { findUnique: (args: { where: { leadId: string } }) => Promise<{ id: string } | null> };
-  leadDoNotCallList: { findUnique: (args: { where: { phone: string } }) => Promise<{ id: string } | null> };
+  leadDoNotCall: {
+    findFirst: (args: object) => Promise<{ id: string } | null>;
+  };
   counsellingOutcome: {
     findFirst: (args: object) => Promise<{ recommendation: string } | null>;
   };
@@ -223,8 +225,11 @@ export class HisConversionAdapter implements ConversionPort {
 
     if (lead.doNotCallFlag) reasons.push("DNC present");
     if (lead.phone) {
-      const dnc = await db.leadDoNotCallList.findUnique({ where: { phone: lead.phone } });
-      if (dnc) reasons.push("DNC present");
+      const { isBlocked } = await import("../application/dnc");
+      const { DncChannel } = await import("../domain/enums");
+      if (await isBlocked({ channel: DncChannel.PHONE, value: lead.phone }, db as never)) {
+        reasons.push("DNC present");
+      }
     }
 
     if (!lead.fullName) reasons.push("Missing fullName");

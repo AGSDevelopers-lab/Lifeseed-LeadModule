@@ -17,8 +17,8 @@ function mockDb(over: Record<string, unknown> = {}) {
     leadConversion: {
       findUnique: vi.fn(async () => null),
     },
-    leadDoNotCallList: {
-      findUnique: vi.fn(async () => null),
+    leadDoNotCall: {
+      findFirst: vi.fn(async () => null),
     },
     counsellingOutcome: {
       findFirst: vi.fn(async () => null),

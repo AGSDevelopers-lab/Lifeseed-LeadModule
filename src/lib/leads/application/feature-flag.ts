@@ -48,3 +48,13 @@ export function isLeadConversionPortEnabled(
   }
   return true;
 }
+
+export type LeadNotificationPortMode = "off" | "in_app_only" | "on";
+
+export function getLeadNotificationPortMode(env?: {
+  LEAD_NOTIFICATION_PORT_ENABLED?: string;
+}): LeadNotificationPortMode {
+  const raw = env?.LEAD_NOTIFICATION_PORT_ENABLED ?? process.env.LEAD_NOTIFICATION_PORT_ENABLED;
+  if (raw === "off" || raw === "in_app_only" || raw === "on") return raw;
+  return "in_app_only";
+}
