@@ -1,24 +1,41 @@
 import { redirect } from "next/navigation";
 
 import {
-  DncForm,
-  DncRemoveButton,
-  formatWhen,
-} from "@/app/(portals)/telecaller/do-not-call/dnc-form";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  DoNotCallClient,
+  type DncListRow,
+} from "@/app/(portals)/telecaller/do-not-call/do-not-call-client";
 import { prisma } from "@/lib/db";
 import {
   getSession,
   permissionGranted,
   permissionsForRoles,
 } from "@/lib/rbac";
+
+function toRow(r: {
+  id: string;
+  channel: string;
+  normalisedValue: string;
+  email: string | null;
+  reason: string;
+  source: string;
+  effectiveFrom: Date;
+  effectiveUntil: Date | null;
+  removalAuthorityUserId: string | null;
+  createdByUserId: string;
+}): DncListRow {
+  return {
+    id: r.id,
+    channel: r.channel,
+    normalisedValue: r.normalisedValue,
+    email: r.email,
+    reason: r.reason,
+    source: r.source,
+    effectiveFrom: r.effectiveFrom.toISOString(),
+    effectiveUntil: r.effectiveUntil?.toISOString() ?? null,
+    removalAuthorityUserId: r.removalAuthorityUserId,
+    createdByUserId: r.createdByUserId,
+  };
+}
 
 export default async function AdminDncPage() {
   const session = await getSession();
@@ -34,48 +51,17 @@ export default async function AdminDncPage() {
   });
 
   const canAdd = permissionGranted(permissionsForRoles(session.roles), "dnc.add");
-  const canRemove = permissionGranted(permissionsForRoles(session.roles), "dnc.remove");
+  const canRemove = permissionGranted(
+    permissionsForRoles(session.roles),
+    "dnc.remove",
+  );
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Do Not Call</h1>
-      {canAdd && <DncForm canRemove={canRemove} />}
-      <div className="rounded-xl border border-stone-200 bg-white">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Channel</TableHead>
-              <TableHead>Value</TableHead>
-              <TableHead>Reason</TableHead>
-              <TableHead>Source</TableHead>
-              <TableHead>Effective from</TableHead>
-              <TableHead>Until</TableHead>
-              <TableHead>Created by</TableHead>
-              <TableHead>Removal authority</TableHead>
-              {canRemove ? <TableHead /> : null}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((r) => (
-              <TableRow key={r.id}>
-                <TableCell className="text-xs">{r.channel}</TableCell>
-                <TableCell>{r.normalisedValue}</TableCell>
-                <TableCell className="text-xs">{r.reason}</TableCell>
-                <TableCell className="text-xs">{r.source}</TableCell>
-                <TableCell className="text-xs">{formatWhen(r.effectiveFrom)}</TableCell>
-                <TableCell className="text-xs">{formatWhen(r.effectiveUntil)}</TableCell>
-                <TableCell className="text-xs">{r.createdByUserId}</TableCell>
-                <TableCell className="text-xs">{r.removalAuthorityUserId ?? "—"}</TableCell>
-                {canRemove ? (
-                  <TableCell>
-                    <DncRemoveButton id={r.id} />
-                  </TableCell>
-                ) : null}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    </div>
+    <DoNotCallClient
+      rows={rows.map(toRow)}
+      canAdd={canAdd}
+      canRemove={canRemove}
+      variant="admin"
+    />
   );
 }
