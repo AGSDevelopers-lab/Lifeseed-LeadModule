@@ -100,6 +100,9 @@ export default async function AdminLeadsPage({
           <Link href="/admin/leads/do-not-call" className="text-emerald-900 hover:underline">
             Do Not Call
           </Link>
+          <Link href="/admin/leads/config" className="text-emerald-900 hover:underline">
+            Config
+          </Link>
           {canExport && (
             <a
               href="/api/leads/export"

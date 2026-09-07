@@ -6,6 +6,10 @@ import {
 
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import { getConfigStoreAdapter } from "@/lib/leads/adapters/config-store-adapter";
+import { resolveConfigPayload } from "@/lib/leads/application/config-store";
+import { DEFAULT_SLA_MATRIX } from "@/lib/leads/config/defaults";
+import { CONFIG_KEYS } from "@/lib/leads/config/keys";
 import {
   ladderToJson,
   SLA_DEFINITIONS,
@@ -21,6 +25,28 @@ function addHours(from: Date, hours: number): Date {
   return d;
 }
 
+async function overlayLeadSla(def: SlaScheduleDefinition): Promise<SlaScheduleDefinition> {
+  if (def.entityType !== SlaEntityType.LEAD_RESPONSE) return def;
+  const matrix = await resolveConfigPayload(
+    getConfigStoreAdapter(prisma),
+    CONFIG_KEYS.SLA_MATRIX_V1,
+    DEFAULT_SLA_MATRIX,
+  );
+  const tier =
+    def.stageKey.includes("hot")
+      ? "HOT"
+      : def.stageKey.includes("warm")
+        ? "WARM"
+        : "COLD";
+  const row = matrix[tier];
+  return {
+    ...def,
+    responseHours: row.responseHours,
+    completeHours: row.completeHours,
+    escalationLadder: row.escalationLadder,
+  };
+}
+
 export async function scheduleSla(
   entityId: string,
   entityType: SlaEntityType,
@@ -28,14 +54,15 @@ export async function scheduleSla(
   startAt: Date = new Date(),
   definition?: SlaScheduleDefinition,
 ): Promise<string> {
-  const def =
+  const found =
     definition ??
     Object.values(SLA_DEFINITIONS).find(
       (d) => d.entityType === entityType && d.stageKey === stageKey,
     );
-  if (!def) {
+  if (!found) {
     throw new Error(`Unknown SLA definition: ${entityType}/${stageKey}`);
   }
+  const def = await overlayLeadSla(found);
 
   const responseDueAt = addHours(startAt, def.responseHours);
   const completeDueAt =

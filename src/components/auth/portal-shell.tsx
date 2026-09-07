@@ -70,6 +70,7 @@ const NAV: Record<PortalKind, NavItem[]> = {
         { href: "/admin/leads/analytics", label: "Analytics" },
         { href: "/admin/leads/crm", label: "CRM sync" },
         { href: "/admin/leads/do-not-call", label: "Do Not Call" },
+        { href: "/admin/leads/config", label: "Lead config" },
       ],
     },
     { href: "/admin/donors", label: "Donors", icon: "donors" },

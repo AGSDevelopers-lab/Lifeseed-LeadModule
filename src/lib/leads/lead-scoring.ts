@@ -5,6 +5,10 @@ import {
   LeadTier,
 } from "@prisma/client";
 
+import { DEFAULT_SCORE_WEIGHTS } from "@/lib/leads/config/defaults";
+import { CONFIG_KEYS } from "@/lib/leads/config/keys";
+import type { ScoreWeights } from "@/lib/leads/config/schemas";
+
 export type LeadScoreInput = {
   personType: LeadPersonType;
   donorSubType?: LeadDonorSubType | null;
@@ -27,76 +31,33 @@ export type LeadScoreResult = {
   tier: LeadTier;
 };
 
-const SOURCE_POINTS: Record<LeadSource, number> = {
-  REFERRAL: 20,
-  CLINIC_REFERRAL: 18,
-  WALK_IN: 15,
-  WEB_FORM: 10,
-  WHATSAPP_BOT: 10,
-  PHONE_INBOUND: 8,
-  SOCIAL_FACEBOOK: 5,
-  SOCIAL_INSTAGRAM: 5,
-  SOCIAL_GOOGLE_ADS: 5,
-  PARTNER_HOSPITAL: 15,
-  OTHER: 2,
-  HOSPITAL_REFERRAL: 2,
-  PARTNER: 2,
-  CAMPAIGN: 2,
-  API: 2,
-  MANUAL: 2,
-};
-
-const SERVICE_AREAS = new Set([
-  "wb",
-  "westbengal",
-  "tg",
-  "telangana",
-  "del",
-  "delhi",
-  "mum",
-  "mumbai",
-  "blr",
-  "bangalore",
-  "bengaluru",
-  "hyd",
-  "hyderabad",
-  "kol",
-  "kolkata",
-]);
-
-const SUPPORTED_LANGS = new Set(["english", "hindi", "bengali", "telugu"]);
-
 function ageContribution(
   personType: LeadPersonType,
   donorSubType: LeadDonorSubType | null | undefined,
   ageGroup: string | null | undefined,
+  w: ScoreWeights,
 ): number {
-  if (personType === LeadPersonType.RECIPIENT) return 15; // no age gate
-  if (!ageGroup) return 5;
+  if (personType === LeadPersonType.RECIPIENT) return w.recipientAgePoints;
+  if (!ageGroup) return w.ageUnknown;
   const m = ageGroup.match(/(\d+)\s*[-–]\s*(\d+)/);
   const mid = m ? (Number(m[1]) + Number(m[2])) / 2 : Number(ageGroup);
-  if (!Number.isFinite(mid)) return 5;
+  if (!Number.isFinite(mid)) return w.ageUnknown;
 
-  if (donorSubType === LeadDonorSubType.OOCYTE) {
-    if (mid >= 23 && mid <= 35) return 20;
-    if (mid >= 21 && mid <= 37) return 12;
-    return 4;
-  }
-  // SEMEN default
-  if (mid >= 21 && mid <= 40) return 20;
-  if (mid >= 18 && mid <= 45) return 12;
-  return 4;
+  const band = donorSubType === LeadDonorSubType.OOCYTE ? w.oocyte : w.semen;
+  if (mid >= band.coreMin && mid <= band.coreMax) return band.corePoints;
+  if (mid >= band.extendedMin && mid <= band.extendedMax) return band.extendedPoints;
+  return band.elsePoints;
 }
 
-function responseContribution(hours: number | null | undefined): number {
+function responseContribution(hours: number | null | undefined, w: ScoreWeights): number {
   if (hours == null) return 0;
-  if (hours <= 1) return 10;
-  if (hours <= 6) return 5;
-  if (hours <= 24) return 2;
-  return 0;
+  if (hours <= 1) return w.response.le1h;
+  if (hours <= 6) return w.response.le6h;
+  if (hours <= 24) return w.response.le24h;
+  return w.response.elsePoints;
 }
 
-function completenessContribution(input: LeadScoreInput): number {
+function completenessContribution(input: LeadScoreInput, w: ScoreWeights): number {
   const fields = [
     input.fullName,
     input.phone,
@@ -108,39 +69,76 @@ function completenessContribution(input: LeadScoreInput): number {
     input.preferredLanguage,
   ];
   const filled = fields.filter((f) => f != null && String(f).trim() !== "").length;
-  return Math.round((filled / fields.length) * 20);
+  return Math.round((filled / fields.length) * w.completenessMax);
 }
 
-function locationContribution(city?: string | null, state?: string | null): number {
+function locationContribution(
+  city: string | null | undefined,
+  state: string | null | undefined,
+  w: ScoreWeights,
+): number {
+  const areas = new Set(w.serviceAreas);
   const keys = [city, state]
     .filter(Boolean)
     .map((s) => s!.trim().toLowerCase().replace(/\s+/g, ""));
-  if (keys.some((k) => SERVICE_AREAS.has(k))) return 10;
-  return keys.length ? 3 : 0;
+  if (keys.some((k) => areas.has(k))) return w.locationInServiceArea;
+  return keys.length ? w.locationOutOfArea : 0;
 }
 
-function languageContribution(lang?: string | null): number {
+function languageContribution(lang: string | null | undefined, w: ScoreWeights): number {
   if (!lang) return 0;
-  return SUPPORTED_LANGS.has(lang.trim().toLowerCase()) ? 5 : 0;
+  return new Set(w.supportedLanguages).has(lang.trim().toLowerCase()) ? w.languageSupported : 0;
 }
 
-export function deriveLeadTier(score: number): LeadTier {
-  if (score >= 75) return LeadTier.HOT;
-  if (score >= 55) return LeadTier.WARM;
-  if (score >= 30) return LeadTier.COLD;
+export function deriveLeadTier(score: number, w: ScoreWeights = DEFAULT_SCORE_WEIGHTS): LeadTier {
+  if (score >= w.tiers.hot) return LeadTier.HOT;
+  if (score >= w.tiers.warm) return LeadTier.WARM;
+  if (score >= w.tiers.cold) return LeadTier.COLD;
   return LeadTier.ARCHIVED;
 }
 
-export function scoreLead(input: LeadScoreInput): LeadScoreResult {
+export function scoreLead(
+  input: LeadScoreInput,
+  weights: ScoreWeights = DEFAULT_SCORE_WEIGHTS,
+): LeadScoreResult {
   const breakdown: Record<string, number> = {
-    age: ageContribution(input.personType, input.donorSubType, input.ageGroup),
-    source: SOURCE_POINTS[input.source] ?? 2,
-    responseSpeed: responseContribution(input.responseHours),
-    completeness: completenessContribution(input),
-    location: locationContribution(input.city, input.state),
-    language: languageContribution(input.preferredLanguage),
+    age: ageContribution(input.personType, input.donorSubType, input.ageGroup, weights),
+    source: weights.sourcePoints[input.source] ?? 2,
+    responseSpeed: responseContribution(input.responseHours, weights),
+    completeness: completenessContribution(input, weights),
+    location: locationContribution(input.city, input.state, weights),
+    language: languageContribution(input.preferredLanguage, weights),
   };
   const raw = Object.values(breakdown).reduce((a, b) => a + b, 0);
   const score = Math.max(0, Math.min(100, raw));
-  return { score, breakdown, tier: deriveLeadTier(score) };
+  return { score, breakdown, tier: deriveLeadTier(score, weights) };
+}
+
+export async function resolveScoreWeights(at?: Date): Promise<{
+  weights: ScoreWeights;
+  configVersion: number | null;
+}> {
+  const { prisma } = await import("@/lib/db");
+  const { getConfigStoreAdapter } = await import("@/lib/leads/adapters/config-store-adapter");
+  const { resolveConfigPayload } = await import("@/lib/leads/application/config-store");
+  const adapter = getConfigStoreAdapter(prisma);
+  const weights = await resolveConfigPayload(
+    adapter,
+    CONFIG_KEYS.SCORE_WEIGHTS_V1,
+    DEFAULT_SCORE_WEIGHTS,
+    at ? { at } : undefined,
+  );
+  const configVersion = await adapter.currentVersion(CONFIG_KEYS.SCORE_WEIGHTS_V1);
+  return { weights, configVersion };
+}
+
+export async function scoreLeadWithConfig(input: LeadScoreInput): Promise<
+  LeadScoreResult & { configKey: string; configVersion: number }
+> {
+  const { weights, configVersion } = await resolveScoreWeights();
+  return {
+    ...scoreLead(input, weights),
+    configKey: CONFIG_KEYS.SCORE_WEIGHTS_V1,
+    configVersion: configVersion ?? 1,
+  };
 }

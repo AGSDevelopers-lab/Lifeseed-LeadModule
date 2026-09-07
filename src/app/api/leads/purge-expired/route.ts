@@ -4,7 +4,12 @@ import { LeadStatus } from "@prisma/client";
 
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import { getConfigStoreAdapter } from "@/lib/leads/adapters/config-store-adapter";
 import { applyAuthorizedLeadStatus } from "@/lib/leads/adapters/prisma-lead-repository";
+import { resolveConfigPayload } from "@/lib/leads/application/config-store";
+import { DEFAULT_RETENTION_POLICY } from "@/lib/leads/config/defaults";
+import { CONFIG_KEYS } from "@/lib/leads/config/keys";
+import { getLeadConfigMode } from "@/lib/leads/config/flag";
 import {
   getSession,
   permissionGranted,
@@ -43,11 +48,21 @@ export async function POST(req: NextRequest) {
   }
 
   const now = new Date();
+  const mode = getLeadConfigMode();
+  const policy = await resolveConfigPayload(
+    getConfigStoreAdapter(prisma),
+    CONFIG_KEYS.RETENTION_POLICY_V1,
+    DEFAULT_RETENTION_POLICY,
+  );
+  const cutoff = new Date(now);
+  cutoff.setUTCDate(cutoff.getUTCDate() - policy.leadUnconvertedDays);
   const expired = await prisma.lead.findMany({
     where: {
-      retentionExpiresAt: { lte: now },
       status: { not: LeadStatus.CONVERTED },
       NOT: { status: LeadStatus.EXPIRED_AUTO_PURGED },
+      ...(mode === "off"
+        ? { retentionExpiresAt: { lte: now } }
+        : { capturedAt: { lte: cutoff } }),
     },
     take: 200,
   });

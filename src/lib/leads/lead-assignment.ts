@@ -2,28 +2,32 @@ import { LeadStatus, LeadTier, UserRole } from "@prisma/client";
 
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
+import { getConfigStoreAdapter } from "@/lib/leads/adapters/config-store-adapter";
 import { applyAuthorizedLeadStatus } from "@/lib/leads/adapters/prisma-lead-repository";
+import { resolveConfigPayload } from "@/lib/leads/application/config-store";
 import {
   getLeadStateMachineMode,
   stateMachinePersistsSideEffects,
 } from "@/lib/leads/application/feature-flag";
+import { DEFAULT_ASSIGNMENT_RULES } from "@/lib/leads/config/defaults";
+import { CONFIG_KEYS } from "@/lib/leads/config/keys";
 
-function maxQueue(): number {
-  const n = Number(process.env.LEADS_MAX_QUEUE_PER_TELECALLER ?? "20");
-  return Number.isFinite(n) && n > 0 ? n : 20;
+async function assignmentRules() {
+  const envCap = Number(process.env.LEADS_MAX_QUEUE_PER_TELECALLER ?? "20");
+  const fallback = {
+    ...DEFAULT_ASSIGNMENT_RULES,
+    maxQueuePerTelecaller:
+      Number.isFinite(envCap) && envCap > 0
+        ? envCap
+        : DEFAULT_ASSIGNMENT_RULES.maxQueuePerTelecaller,
+    autoAssignEnabled: process.env.LEADS_AUTO_ASSIGN_ENABLED !== "false",
+  };
+  return resolveConfigPayload(
+    getConfigStoreAdapter(prisma),
+    CONFIG_KEYS.ASSIGNMENT_RULES_V1,
+    fallback,
+  );
 }
-
-function autoAssignEnabled(): boolean {
-  return process.env.LEADS_AUTO_ASSIGN_ENABLED !== "false";
-}
-
-const OPEN_STATUSES: LeadStatus[] = [
-  LeadStatus.NEW,
-  LeadStatus.ASSIGNED,
-  LeadStatus.CONTACTED_CALLBACK_REQUESTED,
-  LeadStatus.NOT_REACHABLE,
-  LeadStatus.COUNSELLING_BOOKED,
-];
 
 /**
  * Round-robin assign to on-shift telecallers under capacity.
@@ -63,7 +67,8 @@ export async function assignLead(
     return forceUserId;
   }
 
-  if (!autoAssignEnabled()) return null;
+  const rules = await assignmentRules();
+  if (!rules.autoAssignEnabled) return null;
 
   const telecallers = await prisma.user.findMany({
     where: {
@@ -74,13 +79,14 @@ export async function assignLead(
   });
   if (telecallers.length === 0) return null;
 
-  const cap = maxQueue();
+  const cap = rules.maxQueuePerTelecaller;
+  const openStatuses = rules.openStatuses as LeadStatus[];
   const depths = await Promise.all(
     telecallers.map(async (t) => {
       const open = await prisma.lead.count({
         where: {
           assignedTelecallerId: t.id,
-          status: { in: OPEN_STATUSES },
+          status: { in: openStatuses },
         },
       });
       return { id: t.id, open };
