@@ -3,11 +3,13 @@ import { notFound, redirect } from "next/navigation";
 import { LeadStatus, UserRole } from "@prisma/client";
 
 import { LeadCallPanel } from "@/app/(portals)/telecaller/leads/[id]/lead-call-panel";
+import { FollowUpDock } from "@/app/(portals)/telecaller/leads/[id]/follow-up-dock";
 import { Button, Card, CardContent, CardHeader, CardTitle } from "@/components/ui/primitives";
 import { prisma } from "@/lib/db";
 import { resolveLeadActor } from "@/lib/leads/adapters/identity-adapter";
 import { loadTelecallerLeadDetail } from "@/lib/leads/adapters/prisma-lead-repository";
 import { LeadOwnershipDeniedError } from "@/lib/leads/domain/errors";
+import { isLeadFollowUpEnabled } from "@/lib/leads/application/feature-flag";
 import {
   getSession,
   permissionGranted,
@@ -106,6 +108,14 @@ export default async function TelecallerLeadDetailPage({
         sites={sites}
         clinics={clinics}
         coordinators={coordinators}
+      />
+
+      <FollowUpDock
+        leadId={lead.id}
+        enabled={
+          isLeadFollowUpEnabled() &&
+          permissionGranted(permissionsForRoles(session.roles), "follow_up.list")
+        }
       />
 
       <Card>

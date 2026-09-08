@@ -15,6 +15,8 @@ import {
   LeadStatus,
   ScoreTrigger,
   SessionAttendance,
+  SlaEntityType,
+  SlaStatus,
 } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
@@ -265,6 +267,13 @@ export class PrismaLeadTransitionStore implements TransitionStore {
           }
           case "follow_up": {
             if (write.completeOpen) {
+              const openRows = await tx.leadFollowUp.findMany({
+                where: {
+                  leadId,
+                  status: { in: [FollowUpStatus.OPEN, FollowUpStatus.DUE, FollowUpStatus.OVERDUE] },
+                },
+                select: { id: true, slaScheduleId: true },
+              });
               await tx.leadFollowUp.updateMany({
                 where: { leadId, status: { in: [FollowUpStatus.OPEN, FollowUpStatus.DUE, FollowUpStatus.OVERDUE] } },
                 data: {
@@ -273,9 +282,30 @@ export class PrismaLeadTransitionStore implements TransitionStore {
                   completedByUserId: input.actorUserId,
                 },
               });
+              for (const open of openRows) {
+                await tx.leadActivity.create({
+                  data: {
+                    leadId,
+                    activityType: LeadActivityType.FOLLOW_UP,
+                    channel: LeadChannel.SYSTEM,
+                    actorUserId: input.actorUserId,
+                    actorRole: input.actorRole,
+                    occurredAt: input.now,
+                    summary: "FOLLOW_UP completed",
+                    relatedEntityType: "LeadFollowUp",
+                    relatedEntityId: open.id,
+                  },
+                });
+                if (open.slaScheduleId) {
+                  await tx.slaSchedule.updateMany({
+                    where: { id: open.slaScheduleId },
+                    data: { status: SlaStatus.COMPLETED, completedAt: input.now },
+                  });
+                }
+              }
               break;
             }
-            await tx.leadFollowUp.create({
+            const created = await tx.leadFollowUp.create({
               data: {
                 leadId,
                 ownerUserId: input.actorUserId,
@@ -285,7 +315,51 @@ export class PrismaLeadTransitionStore implements TransitionStore {
                 dueAt: write.dueAt,
                 status: FollowUpStatus.OPEN,
               },
-            }).then(followUpToDomain);
+            });
+            followUpToDomain(created);
+            await tx.leadActivity.create({
+              data: {
+                leadId,
+                activityType: LeadActivityType.FOLLOW_UP,
+                channel: LeadChannel.SYSTEM,
+                actorUserId: input.actorUserId,
+                actorRole: input.actorRole,
+                occurredAt: input.now,
+                summary: "FOLLOW_UP created",
+                relatedEntityType: "LeadFollowUp",
+                relatedEntityId: created.id,
+              },
+            });
+            const hours = Math.max(
+              1,
+              Math.ceil((write.dueAt.getTime() - input.now.getTime()) / 3_600_000),
+            );
+            const sla = await tx.slaSchedule.upsert({
+              where: {
+                entityType_entityId_stageKey: {
+                  entityType: SlaEntityType.LEAD_RESPONSE,
+                  entityId: created.id,
+                  stageKey: "FOLLOW_UP",
+                },
+              },
+              create: {
+                entityType: SlaEntityType.LEAD_RESPONSE,
+                entityId: created.id,
+                stageKey: "FOLLOW_UP",
+                startedAt: input.now,
+                responseWithinHours: hours,
+                completeWithinHours: hours,
+                responseDueAt: write.dueAt,
+                completeDueAt: write.dueAt,
+                status: SlaStatus.ACTIVE,
+                escalationLadder: [{ atPct: 100, notifyRole: "OPS_MANAGER" }] as never,
+              },
+              update: {},
+            });
+            await tx.leadFollowUp.update({
+              where: { id: created.id },
+              data: { slaScheduleId: sla.id },
+            });
             break;
           }
           case "call_record": {

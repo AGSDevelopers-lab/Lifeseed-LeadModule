@@ -58,3 +58,19 @@ export function getLeadNotificationPortMode(env?: {
   if (raw === "off" || raw === "in_app_only" || raw === "on") return raw;
   return "in_app_only";
 }
+
+export type LeadFollowUpMode = "off" | "on";
+
+/**
+ * Default `off` in production (safe rollout).
+ * Default `on` in non-production.
+ */
+export function isLeadFollowUpEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  const raw = env.LEAD_FOLLOWUP_ENABLED;
+  if (raw === "on") return true;
+  if (raw === "off") return false;
+  if (env.VERCEL_ENV === "production" || env.NODE_ENV === "production") {
+    return false;
+  }
+  return true;
+}

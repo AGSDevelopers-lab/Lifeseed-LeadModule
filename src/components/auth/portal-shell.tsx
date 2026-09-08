@@ -125,6 +125,7 @@ const NAV: Record<PortalKind, NavItem[]> = {
     { href: "/telecaller/dashboard", label: "Dashboard", icon: "dash" },
     { href: "/telecaller/queue", label: "My Queue", icon: "leads" },
     { href: "/telecaller/leads", label: "All Leads", icon: "users" },
+    { href: "/telecaller/follow-ups", label: "Follow-ups", icon: "headset" },
     { href: "/telecaller/do-not-call", label: "Do Not Call", icon: "headset" },
   ],
   counsellor: [

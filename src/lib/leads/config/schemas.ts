@@ -79,6 +79,8 @@ export const assignmentRulesSchema = z.object({
 
 export const followUpPolicySchema = z.object({
   defaultDueHours: z.number(),
+  /** Minutes after dueAt before DUE → OVERDUE. Absent in B09 seed ⇒ 0. */
+  overdueGraceMinutes: z.number().nonnegative().optional(),
 });
 
 export const counsellingPolicySchema = z.object({
