@@ -310,7 +310,7 @@ Denials always audit-log with `reason` and `requiredPermission`.
 - `lead.archive` · `lead.unarchive`
 - `lead.reactivate`
 - `lead.merge`
-- `lead.convert` · `lead.convert.donor` · `lead.convert.recipient`
+- `lead.convert` · `lead.convert.donor` · `lead.convert.recipient` · `lead.convert.approve`
 - `lead.note.add`
 - `lead.export`
 - `lead.config.view` · `lead.config.propose` · `lead.config.approve`
@@ -331,7 +331,7 @@ Denials always audit-log with `reason` and `requiredPermission`.
 |---|---|---|---|---|---|---|---|---|
 | lead.intake | – | – | – | ✓ | – | – | – | ✓ |
 | lead.intake.api | – | – | – | – | – | – | – | ✓ |
-| lead.view.any | – | – | – | ✓ (site-scoped) | ✓ | – | ✓ | ✓ |
+| lead.view.any | – | – | – | ✓ (site-scoped) | ✓ | – | – | ✓ |
 | lead.view.own | ✓ | ✓ | – | – | – | – | – | ✓ |
 | lead.view.assigned_for_counselling | – | – | ✓ | – | – | – | – | ✓ |
 | lead.view.for_own_clinic | – | – | – | – | – | – | – | ✓ |
@@ -346,6 +346,7 @@ Denials always audit-log with `reason` and `requiredPermission`.
 | lead.merge | – | – | – | ✓ | – | – | – | ✓ |
 | lead.convert (donor) | ✓ (with supervisor confirmation) | ✓ | – | ✓ | – | – | – | ✓ |
 | lead.convert (recipient) | ✓ (post-counselling only) | ✓ | ✓ | ✓ | – | – | – | ✓ |
+| lead.convert.approve | – | – | – | ✓ | – | – | – | ✓ |
 | lead.note.add | ✓ (own) | ✓ (own) | ✓ (own counselling) | ✓ | – | – | – | ✓ |
 | lead.export | – | – | – | ✓ | ✓ | – | – | ✓ |
 | lead.config.view | – | – | – | ✓ | ✓ | ✓ | ✓ | ✓ |
@@ -474,3 +475,12 @@ Must-audit actions:
 
 **Document owner:** Engineering
 **Next review:** upon completion of Batch C1 · full OpenAPI spec exported to `/api/leads/v2/openapi.json`
+
+---
+
+## 10 · Change Log
+
+| Date | Ref | Change |
+|---|---|---|
+| 2026-09-12 | LADR-24 | Added canonical `lead.convert.approve` to §4.3. §4.4 grants it **only** to `OPS_MANAGER` and `BANK_SUPER_ADMIN`. Distinct from `lead.convert` / `.donor` / `.recipient` (initiate). |
+| 2026-09-12 | LADR-25 | Removed `lead.view.any` from `BANK_MED_DIR`. Medical director remains config/analytics/audit viewer only — **no** case-level Lead read/list. |
