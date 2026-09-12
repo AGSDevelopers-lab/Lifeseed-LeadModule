@@ -52,7 +52,11 @@ export default async function CategoryDashboardPage({ params }: Props) {
   if (!canView) redirect("/admin/reports");
 
   const [{ kpis, chartHints }, reports] = await Promise.all([
-    loadCategoryKpis(category),
+    loadCategoryKpis(category, {
+      userId: session.userId,
+      roles: session.roles,
+      siteId: session.siteId,
+    }),
     Promise.resolve(getReportsByCategory(category, session)),
   ]);
 

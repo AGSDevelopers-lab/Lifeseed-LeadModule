@@ -122,10 +122,7 @@ export async function persistNewLead(input: CreateLeadInput) {
     },
   });
 
-  const refreshed = await prisma.lead.findUniqueOrThrow({
-    where: { id: lead.id },
-  });
-  return refreshed;
+  return lead;
 }
 
 export async function createLeadFromIntake(input: CreateLeadInput) {

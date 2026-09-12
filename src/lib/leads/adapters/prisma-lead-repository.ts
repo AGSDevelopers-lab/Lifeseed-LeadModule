@@ -107,8 +107,24 @@ export class PrismaLeadRepository implements LeadRepository {
     return toDomain(row);
   }
 
+  async count(actor: ActorContext, filters?: LeadListFilters): Promise<number> {
+    const where = mergeLeadListFilters(leadListScopeWhere(actor), filters);
+    return prisma.lead.count({ where: where as Prisma.LeadWhereInput });
+  }
+
+  async groupBySource(actor: ActorContext, filters?: LeadListFilters) {
+    const where = mergeLeadListFilters(leadListScopeWhere(actor), filters);
+    const rows = await prisma.lead.groupBy({
+      by: ["source"],
+      where: where as Prisma.LeadWhereInput,
+      _count: { _all: true },
+    });
+    return rows.map((r) => ({ source: r.source, count: r._count._all }));
+  }
+
   async list(actor: ActorContext, filters?: LeadListFilters): Promise<LeadListPage> {
-    const limit = Math.min(Math.max(filters?.limit ?? 50, 1), 200);
+    const ceiling = filters?.purpose === "export" ? 5000 : 200;
+    const limit = Math.min(Math.max(filters?.limit ?? 50, 1), ceiling);
     const scope = leadListScopeWhere(actor);
     const where = mergeLeadListFilters(scope, filters);
     const cursor = filters?.cursor ? decodeLeadCursor(filters.cursor) : null;
@@ -184,8 +200,20 @@ export async function countScopedLeads(
   actor: ActorContext,
   extra: LeadListFilters = {},
 ): Promise<number> {
-  const where = mergeLeadListFilters(leadListScopeWhere(actor), extra);
-  return prisma.lead.count({ where: where as Prisma.LeadWhereInput });
+  return prismaLeadRepository.count(actor, extra);
+}
+
+/** Assignment queue depth — per-assignee, not a cross-actor list (BATCH 1). */
+export async function countAssignedOpenLeads(
+  telecallerId: string,
+  openStatuses: LeadStatus[],
+): Promise<number> {
+  return prisma.lead.count({
+    where: {
+      assignedTelecallerId: telecallerId,
+      status: { in: openStatuses },
+    },
+  });
 }
 
 export const prismaLeadRepository = new PrismaLeadRepository();
@@ -271,6 +299,15 @@ export async function assertLeadReadable(
     });
   }
   return lead;
+}
+
+/** Prisma row after repository scope check — conversion/legacy writers only. */
+export async function loadPrismaLeadAfterAccess(
+  id: string,
+  ctx: ActorContext,
+) {
+  await assertLeadReadable(id, ctx);
+  return prisma.lead.findUnique({ where: { id } });
 }
 
 /** Interactive-tx options for pgBouncer transaction-mode (Supabase :6543). */

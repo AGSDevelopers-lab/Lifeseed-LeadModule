@@ -1,6 +1,10 @@
 import "server-only";
 
 import { LeadStatus } from "@prisma/client";
+import {
+  FUNNEL_CONTACTED_STATUSES,
+  FUNNEL_COUNSELLED_STATUSES,
+} from "@/lib/leads/application/funnel-status-groups";
 
 import { prisma } from "@/lib/db";
 import {
@@ -25,15 +29,7 @@ const STAGES: Stage[] = [
   {
     key: "contacted",
     label: "Contacted",
-    statuses: [
-      LeadStatus.CONTACTED_QUALIFIED,
-      LeadStatus.CONTACTED_NOT_INTERESTED,
-      LeadStatus.CONTACTED_CALLBACK_REQUESTED,
-      LeadStatus.COUNSELLING_BOOKED,
-      LeadStatus.COUNSELLING_ATTENDED,
-      LeadStatus.COUNSELLING_NO_SHOW,
-      LeadStatus.CONVERTED,
-    ],
+    statuses: FUNNEL_CONTACTED_STATUSES,
   },
   {
     key: "qualified",
@@ -48,10 +44,7 @@ const STAGES: Stage[] = [
   {
     key: "counselled",
     label: "Counselled",
-    statuses: [
-      LeadStatus.COUNSELLING_ATTENDED,
-      LeadStatus.CONVERTED,
-    ],
+    statuses: FUNNEL_COUNSELLED_STATUSES,
   },
   {
     key: "converted",
@@ -107,16 +100,21 @@ export const donorFunnelReport: ReportDefinition = {
     { key: "avgDaysInStage", label: "Avg days in stage", formatter: "number", numeric: true, higherIsBetter: false },
     { key: "topDropOffReason", label: "Top drop-off reason" },
   ],
-  async query(filters) {
+  async query(filters, scope) {
     const { from, to } = parseDateRange(filters);
+    const actor = {
+      userId: scope.user.userId,
+      roles: scope.user.roles,
+      siteId: scope.user.siteId,
+    };
 
     const [leads, donors, lost] = await Promise.all([
-      scanDonorFunnelLeads(from, to),
+      scanDonorFunnelLeads(actor, from, to),
       prisma.donor.findMany({
         where: { createdAt: { gte: from, lte: to } },
         select: { phase: true, createdAt: true, updatedAt: true },
       }),
-      groupLostReasons(from, to),
+      groupLostReasons(actor, from, to),
     ]);
 
     const topDrop =

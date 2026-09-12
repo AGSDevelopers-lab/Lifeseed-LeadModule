@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { countLeadsWhere, groupLeadsBySource } from "@/lib/leads/adapters/prisma-lead-analytics";
+import { resolveLeadActor } from "@/lib/leads/adapters/identity-adapter";
 import { prisma } from "@/lib/db";
 import {
   getSession,
@@ -31,8 +32,11 @@ export default async function AdminLeadsAnalyticsPage() {
     redirect("/admin/leads");
   }
 
-  const bySource = await groupLeadsBySource();
-  const convertedBySource = await groupLeadsBySource({
+  const actor = await resolveLeadActor();
+  if (!actor) redirect("/login");
+
+  const bySource = await groupLeadsBySource(actor);
+  const convertedBySource = await groupLeadsBySource(actor, {
     status: LeadStatus.CONVERTED,
   });
   const convMap = new Map(
@@ -48,7 +52,7 @@ export default async function AdminLeadsAnalyticsPage() {
     telecallers.map(async (t) => {
       const [calls, conversions] = await Promise.all([
         prisma.callDisposition.count({ where: { telecallerId: t.id } }),
-        countLeadsWhere({
+        countLeadsWhere(actor, {
             convertedByUserId: t.id,
             status: LeadStatus.CONVERTED,
           }),

@@ -9,6 +9,13 @@ export default defineConfig({
     environment: "node",
     include: ["src/lib/leads/**/*.test.ts"],
     exclude: ["node_modules", ".next"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json-summary", "lcov"],
+      reportsDirectory: "./coverage",
+      include: ["src/lib/leads/**/*.ts"],
+      exclude: ["src/lib/leads/**/*.test.ts", "src/lib/leads/testing/**"],
+    },
   },
   resolve: {
     alias: {

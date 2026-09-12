@@ -39,11 +39,35 @@ export class InMemoryLeadRepository implements LeadRepository {
         /* ownership denied */
       }
     }
-    const filtered = filters?.status
-      ? items.filter((l) => l.status === filters.status)
-      : items;
+    const filtered = this.filterItems(items, filters);
     const limit = filters?.limit ?? 50;
     return { items: filtered.slice(0, limit), nextCursor: null };
+  }
+
+  async count(actor: ActorContext, filters?: LeadListFilters): Promise<number> {
+    const page = await this.list(actor, { ...filters, limit: 10_000 });
+    return page.items.length;
+  }
+
+  async groupBySource(actor: ActorContext, filters?: LeadListFilters) {
+    const page = await this.list(actor, { ...filters, limit: 10_000 });
+    const map = new Map<string, number>();
+    for (const lead of page.items) {
+      const s = String(lead.props.source);
+      map.set(s, (map.get(s) ?? 0) + 1);
+    }
+    return [...map.entries()].map(([source, count]) => ({ source, count }));
+  }
+
+  private filterItems(items: Lead[], filters?: LeadListFilters): Lead[] {
+    if (!filters) return items;
+    return items.filter((l) => {
+      if (filters.status && l.status !== filters.status) return false;
+      if (filters.statuses && !filters.statuses.includes(l.status)) return false;
+      if (filters.statusNot && l.status === filters.statusNot) return false;
+      if (filters.statusNotIn?.includes(l.status)) return false;
+      return true;
+    });
   }
 
   async create(lead: Lead): Promise<Lead> {

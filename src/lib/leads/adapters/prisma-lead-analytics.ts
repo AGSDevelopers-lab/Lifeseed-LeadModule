@@ -1,15 +1,24 @@
 import { LeadStatus, type Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
+import type { ActorContext } from "../domain/ports/shared";
+import type { LeadListFilters } from "../domain/ports/LeadRepository";
+import { leadListScopeWhere, mergeLeadListFilters } from "./lead-access-scope";
+import { prismaLeadRepository } from "./prisma-lead-repository";
 
-/** Aggregate Lead reads for reports — stays inside adapters/prisma (P0-1). */
-export async function scanDonorFunnelLeads(from: Date, to: Date) {
+function scopedWhere(actor: ActorContext, filters?: LeadListFilters): Prisma.LeadWhereInput {
+  return mergeLeadListFilters(leadListScopeWhere(actor), filters) as Prisma.LeadWhereInput;
+}
+
+/** Aggregate Lead reads — actor-scoped (CONFLICT-25). STOP-3 v1.4 / P0-1. */
+export async function scanDonorFunnelLeads(actor: ActorContext, from: Date, to: Date) {
   return prisma.lead.findMany({
-    where: {
+    where: scopedWhere(actor, {
       personType: "DONOR",
-      capturedAt: { gte: from, lte: to },
-      status: { not: LeadStatus.EXPIRED_AUTO_PURGED },
-    },
+      from,
+      to,
+      statusNot: LeadStatus.EXPIRED_AUTO_PURGED,
+    }),
     select: {
       status: true,
       lostReason: true,
@@ -20,35 +29,40 @@ export async function scanDonorFunnelLeads(from: Date, to: Date) {
   });
 }
 
-export async function groupLostReasons(from: Date, to: Date) {
+export async function groupLostReasons(actor: ActorContext, from: Date, to: Date) {
   return prisma.lead.groupBy({
     by: ["lostReason"],
-    where: {
+    where: scopedWhere(actor, {
       personType: "DONOR",
-      capturedAt: { gte: from, lte: to },
-      status: { in: [LeadStatus.LOST, LeadStatus.CONTACTED_NOT_INTERESTED] },
-    },
+      from,
+      to,
+      statuses: [LeadStatus.LOST, LeadStatus.CONTACTED_NOT_INTERESTED],
+    }),
     _count: { _all: true },
     orderBy: { _count: { lostReason: "desc" } },
     take: 1,
   });
 }
 
-export async function countLeadsWhere(where: Prisma.LeadWhereInput): Promise<number> {
-  return prisma.lead.count({ where });
+export async function countLeadsWhere(
+  actor: ActorContext,
+  filters: LeadListFilters = {},
+): Promise<number> {
+  return prismaLeadRepository.count(actor, filters);
 }
 
-export async function groupLeadsBySource(where?: Prisma.LeadWhereInput) {
-  return prisma.lead.groupBy({
-    by: ["source"],
-    where,
-    _count: { _all: true },
-  });
+export async function groupLeadsBySource(actor: ActorContext, filters?: LeadListFilters) {
+  const rows = await prismaLeadRepository.groupBySource(actor, filters);
+  return rows.map((r) => ({ source: r.source, _count: { _all: r.count } }));
 }
 
-export async function listExpiredLeadIds(where: Prisma.LeadWhereInput, take: number) {
+export async function listExpiredLeadIds(
+  actor: ActorContext,
+  filters: LeadListFilters,
+  take: number,
+) {
   const rows = await prisma.lead.findMany({
-    where,
+    where: scopedWhere(actor, filters),
     select: { id: true },
     take,
   });
@@ -61,9 +75,13 @@ export async function countNoShowSessions(leadId: string): Promise<number> {
   });
 }
 
-export async function listLeadIdsByStatus(status: LeadStatus, take: number): Promise<string[]> {
+export async function listLeadIdsByStatus(
+  actor: ActorContext,
+  status: LeadStatus,
+  take: number,
+): Promise<string[]> {
   const rows = await prisma.lead.findMany({
-    where: { status },
+    where: scopedWhere(actor, { status }),
     select: { id: true },
     take,
   });

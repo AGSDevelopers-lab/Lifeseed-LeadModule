@@ -10,6 +10,7 @@ import {
 import { prisma } from "@/lib/db";
 import { countLeadsWhere } from "@/lib/leads/adapters/prisma-lead-analytics";
 import type { ReportCategory } from "@prisma/client";
+import type { ActorContext } from "@/lib/leads/domain/ports/shared";
 
 export type KpiValue = {
   key: string;
@@ -26,6 +27,7 @@ export function formatKpi(value: number | null): string {
 
 export async function loadCategoryKpis(
   category: ReportCategory,
+  actor?: ActorContext | null,
 ): Promise<{ kpis: KpiValue[]; chartHints: string[] }> {
   switch (category) {
     case "CLINICAL":
@@ -33,7 +35,7 @@ export async function loadCategoryKpis(
     case "FINANCE":
       return loadFinance();
     case "LOGISTICS":
-      return loadLogistics();
+      return loadLogistics(actor);
     case "COMPLIANCE":
       return loadCompliance();
     default:
@@ -119,14 +121,15 @@ async function loadFinance() {
   };
 }
 
-async function loadLogistics() {
+async function loadLogistics(actor?: ActorContext | null) {
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const scoped = actor ?? { userId: "anonymous", roles: [] as const, siteId: null };
   const [leads, converted, dispatches, delivered] = await Promise.all([
-    countLeadsWhere({ personType: "DONOR", capturedAt: { gte: since } }),
-    countLeadsWhere({
+    countLeadsWhere(scoped, { personType: "DONOR", from: since }),
+    countLeadsWhere(scoped, {
       personType: "DONOR",
       status: LeadStatus.CONVERTED,
-      capturedAt: { gte: since },
+      from: since,
     }),
     prisma.dispatchOrder.count({
       where: { createdAt: { gte: since } },

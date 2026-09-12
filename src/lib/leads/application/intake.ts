@@ -66,6 +66,5 @@ export async function intakeLead(input: CreateLeadInput) {
   }
 
   await assignLead(created.id, input.actorId, input.assignToUserId ?? undefined);
-  const { prisma } = await import("@/lib/db");
-  return prisma.lead.findUniqueOrThrow({ where: { id: created.id } });
+  return created;
 }

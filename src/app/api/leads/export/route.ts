@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 
+import { getConfigStoreAdapter } from "@/lib/leads/adapters/config-store-adapter";
 import { prismaLeadRepository } from "@/lib/leads/adapters/prisma-lead-repository";
 import { resolveLeadActor } from "@/lib/leads/adapters/identity-adapter";
+import { resolveConfigPayload } from "@/lib/leads/application/config-store";
+import { DEFAULT_EXPORT_ROW_CAP } from "@/lib/leads/config/defaults";
+import { CONFIG_KEYS } from "@/lib/leads/config/keys";
+import { prisma } from "@/lib/db";
 import {
   getSession,
   permissionGranted,
   permissionsForRoles,
 } from "@/lib/rbac";
 
+/** CONFLICT-26 — CSV cap via LeadConfig EXPORT_ROW_CAP_V1, actor-scoped list. */
 export async function GET() {
   const session = await getSession();
   if (!session) {
@@ -21,7 +27,17 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const page = await prismaLeadRepository.list(actor, { limit: 200 });
+  const cap = await resolveConfigPayload(
+    getConfigStoreAdapter(prisma),
+    CONFIG_KEYS.EXPORT_ROW_CAP_V1,
+    DEFAULT_EXPORT_ROW_CAP,
+  );
+  const maxRows = Math.min(Math.max(cap.maxRows ?? 5000, 1), 5000);
+
+  const page = await prismaLeadRepository.list(actor, {
+    limit: maxRows,
+    purpose: "export",
+  });
   const rows = page.items;
 
   const headers = [

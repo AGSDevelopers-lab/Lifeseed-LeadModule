@@ -250,7 +250,7 @@ export async function convertDonor(
     const mode = getLeadStateMachineMode();
     const result = await convertLeadToDonor(leadId, actor.userId, extras, {
       skipStatusWrite: stateMachinePersistsSideEffects(mode),
-    });
+    }, actor);
     if (result.ok && stateMachinePersistsSideEffects(mode)) {
       await convertDonorStub(leadId, actor);
     }
@@ -281,7 +281,7 @@ export async function convertRecipient(
     const mode = getLeadStateMachineMode();
     const result = await convertLeadToRecipient(leadId, actor.userId, input, {
       skipStatusWrite: stateMachinePersistsSideEffects(mode),
-    });
+    }, actor);
     if (result.ok && stateMachinePersistsSideEffects(mode)) {
       await convertRecipientStub(leadId, actor);
     }

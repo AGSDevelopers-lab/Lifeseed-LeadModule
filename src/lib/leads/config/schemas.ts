@@ -103,6 +103,10 @@ export const duplicateMatchRulesSchema = z.object({
   nameEmailFuzzy: z.boolean(),
 });
 
+export const exportRowCapSchema = z.object({
+  maxRows: z.number().int().positive().max(5000),
+});
+
 export const CONFIG_SCHEMAS: Record<ConfigKey, z.ZodType> = {
   [CONFIG_KEYS.SCORE_WEIGHTS_V1]: scoreWeightsSchema,
   [CONFIG_KEYS.SLA_MATRIX_V1]: slaMatrixSchema,
@@ -113,6 +117,7 @@ export const CONFIG_SCHEMAS: Record<ConfigKey, z.ZodType> = {
   [CONFIG_KEYS.NOTIFICATION_TEMPLATE_MAP_V1]: notificationTemplateMapSchema,
   [CONFIG_KEYS.CAMPAIGN_RULES_V1]: campaignRulesSchema,
   [CONFIG_KEYS.DUPLICATE_MATCH_RULES_V1]: duplicateMatchRulesSchema,
+  [CONFIG_KEYS.EXPORT_ROW_CAP_V1]: exportRowCapSchema,
 };
 
 export type ScoreWeights = z.infer<typeof scoreWeightsSchema>;

@@ -33,8 +33,19 @@ export default async function TelecallerDashboardPage() {
   const [open, breaching, convertedToday, calledToday, durations] =
     await Promise.all([
       countScopedLeads(actor, { status: LeadStatus.ASSIGNED }),
-      countScopedLeads(actor),
-      countScopedLeads(actor, { status: LeadStatus.CONVERTED }),
+      countScopedLeads(actor, {
+        slaResponseDueBefore: new Date(Date.now() + 2 * 60 * 60 * 1000),
+        statusNotIn: [
+          LeadStatus.CONVERTED,
+          LeadStatus.LOST,
+          LeadStatus.EXPIRED_AUTO_PURGED,
+          LeadStatus.DO_NOT_CALL,
+        ],
+      }),
+      countScopedLeads(actor, {
+        status: LeadStatus.CONVERTED,
+        convertedAtFrom: startOfDay,
+      }),
       prisma.callDisposition.count({
         where: {
           telecallerId: session.userId,

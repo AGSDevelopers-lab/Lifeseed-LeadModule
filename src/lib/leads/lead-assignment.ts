@@ -3,7 +3,11 @@ import { LeadStatus, LeadTier, UserRole } from "@prisma/client";
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { getConfigStoreAdapter } from "@/lib/leads/adapters/config-store-adapter";
-import { applyAuthorizedLeadStatus } from "@/lib/leads/adapters/prisma-lead-repository";
+import {
+  applyAuthorizedLeadStatus,
+  countAssignedOpenLeads,
+  prismaLeadRepository,
+} from "@/lib/leads/adapters/prisma-lead-repository";
 import { resolveConfigPayload } from "@/lib/leads/application/config-store";
 import {
   getLeadStateMachineMode,
@@ -44,7 +48,7 @@ export async function assignLead(
         "@/lib/leads/application/commands"
       );
       const actor = { userId: actorId ?? forceUserId, roles: ["OPS_MANAGER"] };
-      const existing = await prisma.lead.findUnique({ where: { id: leadId }, select: { status: true } });
+      const existing = await prismaLeadRepository.byId(leadId, actor);
       if (existing?.status === LeadStatus.ASSIGNED) {
         await reassignLeadToUser(leadId, actor, forceUserId, "manual reassign");
       } else {
@@ -83,12 +87,7 @@ export async function assignLead(
   const openStatuses = rules.openStatuses as LeadStatus[];
   const depths = await Promise.all(
     telecallers.map(async (t) => {
-      const open = await prisma.lead.count({
-        where: {
-          assignedTelecallerId: t.id,
-          status: { in: openStatuses },
-        },
-      });
+      const open = await countAssignedOpenLeads(t.id, openStatuses);
       return { id: t.id, open };
     }),
   );

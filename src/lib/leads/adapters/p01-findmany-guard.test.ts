@@ -15,15 +15,32 @@ function walk(dir: string, acc: string[] = []): string[] {
   return acc;
 }
 
-describe("P0-1 prisma.lead.findMany boundary", () => {
-  it("has zero application-layer prisma.lead.findMany outside adapters/prisma", () => {
+const ADAPTER = `${path.sep}lib${path.sep}leads${path.sep}adapters${path.sep}`;
+
+describe("P0-1 prisma.lead read boundary", () => {
+  it("has zero application-layer prisma.lead.findMany outside adapters", () => {
     const src = path.join(root, "src");
-    const allow = `${path.sep}lib${path.sep}leads${path.sep}adapters${path.sep}`;
     const hits: string[] = [];
     for (const file of walk(src)) {
-      if (file.includes(allow)) continue;
+      if (file.includes(ADAPTER)) continue;
       const text = fs.readFileSync(file, "utf8");
       if (text.includes("prisma.lead.findMany")) {
+        hits.push(path.relative(src, file));
+      }
+    }
+    expect(hits).toEqual([]);
+  });
+
+  it("has zero application-layer prisma.lead.findUnique / findUniqueOrThrow outside adapters", () => {
+    const src = path.join(root, "src");
+    const hits: string[] = [];
+    for (const file of walk(src)) {
+      if (file.includes(ADAPTER)) continue;
+      const text = fs.readFileSync(file, "utf8");
+      if (
+        text.includes("prisma.lead.findUnique") ||
+        text.includes("prisma.lead.findUniqueOrThrow")
+      ) {
         hits.push(path.relative(src, file));
       }
     }

@@ -10,6 +10,7 @@ export const CONFIG_KEYS = {
   NOTIFICATION_TEMPLATE_MAP_V1: "NOTIFICATION_TEMPLATE_MAP_V1",
   CAMPAIGN_RULES_V1: "CAMPAIGN_RULES_V1",
   DUPLICATE_MATCH_RULES_V1: "DUPLICATE_MATCH_RULES_V1",
+  EXPORT_ROW_CAP_V1: "EXPORT_ROW_CAP_V1",
 } as const;
 
 export type ConfigKey = (typeof CONFIG_KEYS)[keyof typeof CONFIG_KEYS];
@@ -30,6 +31,7 @@ export const CONFIG_OWNER_ROLE: Record<ConfigKey, UserRole> = {
   NOTIFICATION_TEMPLATE_MAP_V1: UserRole.MARKETING_MANAGER,
   CAMPAIGN_RULES_V1: UserRole.MARKETING_MANAGER,
   DUPLICATE_MATCH_RULES_V1: UserRole.OPS_MANAGER,
+  EXPORT_ROW_CAP_V1: UserRole.OPS_MANAGER,
 };
 
 export const CONFIG_LABELS: Record<ConfigKey, string> = {
@@ -42,6 +44,7 @@ export const CONFIG_LABELS: Record<ConfigKey, string> = {
   NOTIFICATION_TEMPLATE_MAP_V1: "Notification template map",
   CAMPAIGN_RULES_V1: "Campaign rules",
   DUPLICATE_MATCH_RULES_V1: "Duplicate match rules",
+  EXPORT_ROW_CAP_V1: "CSV export row cap",
 };
 
 export function isConfigKey(value: string): value is ConfigKey {

@@ -165,8 +165,41 @@ export function mergeLeadListFilters(
   if (!filters) return where;
   if (filters.source) where.source = filters.source;
   if (filters.tier) where.tier = filters.tier;
-  if (filters.status) where.status = filters.status;
+  if (filters.status) {
+    where.status = filters.status;
+  } else if (filters.statuses && filters.statuses.length > 0) {
+    where.status = { in: filters.statuses };
+  }
+  if (filters.statusNot) {
+    where.NOT = [
+      ...(Array.isArray(where.NOT) ? where.NOT : where.NOT ? [where.NOT] : []),
+      { status: filters.statusNot },
+    ];
+  }
+  if (filters.statusNotIn && filters.statusNotIn.length > 0) {
+    const prev = where.status;
+    if (prev && typeof prev === "object" && "in" in prev) {
+      where.status = { in: prev.in, notIn: filters.statusNotIn };
+    } else if (typeof prev === "string") {
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        { status: { notIn: filters.statusNotIn } },
+      ];
+    } else {
+      where.status = { notIn: filters.statusNotIn };
+    }
+  }
   if (filters.outcome) where.outcome = filters.outcome;
+  if (filters.convertedByUserId) where.convertedByUserId = filters.convertedByUserId;
+  if (filters.slaResponseDueBefore) {
+    where.slaResponseDueAt = { lte: filters.slaResponseDueBefore };
+  }
+  if (filters.convertedAtFrom) {
+    where.convertedAt = { gte: filters.convertedAtFrom };
+  }
+  if (filters.retentionExpiresAtTo) {
+    where.retentionExpiresAt = { lte: filters.retentionExpiresAtTo };
+  }
   if (filters.isArchived !== undefined) where.isArchived = filters.isArchived;
   if (filters.personType) where.personType = filters.personType;
   if (filters.campaignId) where.campaignId = filters.campaignId;

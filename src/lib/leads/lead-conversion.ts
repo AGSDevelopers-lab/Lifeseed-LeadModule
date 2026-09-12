@@ -10,7 +10,8 @@ import {
 import { createDonorIntake } from "@/app/(portals)/admin/donors/actions";
 import { audit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
-import { applyAuthorizedLeadStatus } from "@/lib/leads/adapters/prisma-lead-repository";
+import { applyAuthorizedLeadStatus, loadPrismaLeadAfterAccess } from "@/lib/leads/adapters/prisma-lead-repository";
+import type { ActorContext } from "@/lib/leads/domain/ports/shared";
 import { markCompletedByEntity } from "@/lib/sla/engine";
 import { isLeadConversionPortEnabled } from "@/lib/leads/application/feature-flag";
 
@@ -40,6 +41,7 @@ export async function convertLeadToDonor(
   actorId: string,
   extras: DonorConvertExtras,
   options: { skipStatusWrite?: boolean } = {},
+  ctx?: ActorContext,
 ): Promise<{ ok: true; donorId: string } | { ok: false; error: string }> {
   if (isLeadConversionPortEnabled()) {
     const { convertDonor } = await import("@/lib/leads/application/convert");
@@ -55,7 +57,7 @@ export async function convertLeadToDonor(
       leadId,
     }),
   );
-  return convertLeadToDonorLegacy(leadId, actorId, extras, options);
+  return convertLeadToDonorLegacy(leadId, actorId, extras, options, ctx);
 }
 
 async function convertLeadToDonorLegacy(
@@ -63,8 +65,12 @@ async function convertLeadToDonorLegacy(
   actorId: string,
   extras: DonorConvertExtras,
   options: { skipStatusWrite?: boolean } = {},
+  ctx?: ActorContext,
 ): Promise<{ ok: true; donorId: string } | { ok: false; error: string }> {
-  const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+  const lead = await loadPrismaLeadAfterAccess(
+    leadId,
+    ctx ?? { userId: actorId, roles: ["TELECALLER"] },
+  );
   if (!lead) return { ok: false, error: "Lead not found" };
   if (lead.personType !== LeadPersonType.DONOR) {
     return { ok: false, error: "Lead is not a donor lead" };
@@ -202,6 +208,7 @@ export async function convertLeadToRecipient(
   actorId: string,
   input: RecipientConvertInput,
   options: { skipStatusWrite?: boolean } = {},
+  ctx?: ActorContext,
 ): Promise<{ ok: true; recipientId: string } | { ok: false; error: string }> {
   if (isLeadConversionPortEnabled()) {
     const { convertRecipient } = await import("@/lib/leads/application/convert");
@@ -217,7 +224,7 @@ export async function convertLeadToRecipient(
       leadId,
     }),
   );
-  return convertLeadToRecipientLegacy(leadId, actorId, input, options);
+  return convertLeadToRecipientLegacy(leadId, actorId, input, options, ctx);
 }
 
 async function convertLeadToRecipientLegacy(
@@ -225,8 +232,12 @@ async function convertLeadToRecipientLegacy(
   actorId: string,
   input: RecipientConvertInput,
   options: { skipStatusWrite?: boolean } = {},
+  ctx?: ActorContext,
 ): Promise<{ ok: true; recipientId: string } | { ok: false; error: string }> {
-  const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+  const lead = await loadPrismaLeadAfterAccess(
+    leadId,
+    ctx ?? { userId: actorId, roles: ["TELECALLER"] },
+  );
   if (!lead) return { ok: false, error: "Lead not found" };
   if (lead.personType !== LeadPersonType.RECIPIENT) {
     return { ok: false, error: "Lead is not a recipient lead" };

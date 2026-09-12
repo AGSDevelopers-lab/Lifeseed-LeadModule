@@ -57,8 +57,8 @@ async function requireReadableLead(leadId: string) {
       denialReason: "AUTHENTICATION_REQUIRED",
     });
   }
-  await assertLeadReadable(leadId, actor);
-  return actor;
+  const lead = await assertLeadReadable(leadId, actor);
+  return { actor, lead };
 }
 
 const dispositionSchema = z.object({
@@ -78,7 +78,7 @@ export async function saveDisposition(
     const parsed = dispositionSchema.safeParse(input);
     if (!parsed.success) return { ok: false, error: "Validation failed" };
     const d = parsed.data;
-    const actor = await requireReadableLead(d.leadId);
+    const { actor, lead: scopedLead } = await requireReadableLead(d.leadId);
 
     const started = new Date(d.callStartedAt);
     const ended = d.callEndedAt ? new Date(d.callEndedAt) : new Date();
@@ -148,11 +148,11 @@ export async function saveDisposition(
     }
 
     if (d.disposition === CallDispositionType.DO_NOT_CALL) {
-      const lead = await prisma.lead.findUnique({ where: { id: d.leadId } });
-      if (lead?.phone) {
+      const phone = scopedLead.props.contact.phone;
+      if (phone) {
         await addDncFromLeadContact({
-          phone: lead.phone,
-          email: lead.email,
+          phone,
+          email: scopedLead.props.contact.email,
           reason: d.notes ?? "Disposition DO_NOT_CALL",
           createdByUserId: session.userId,
           sourceLeadId: d.leadId,
@@ -194,7 +194,7 @@ export async function bookCounselling(
     const parsed = bookSchema.safeParse(input);
     if (!parsed.success) return { ok: false, error: "Validation failed" };
     const d = parsed.data;
-    const actor = await requireReadableLead(d.leadId);
+    const { actor } = await requireReadableLead(d.leadId);
     const duration =
       d.durationMinutes ??
       Number(process.env.COUNSELLING_DEFAULT_DURATION_MIN ?? "30");
@@ -335,7 +335,7 @@ export async function convertDonorAction(
   try {
     await requirePermission("lead.convert");
     await requirePermission("donor.create");
-    const actor = await requireReadableLead(leadId);
+    const { actor } = await requireReadableLead(leadId);
     const result = await (await import("@/lib/leads/application/convert")).convertDonor(
       leadId,
       actor,
@@ -356,7 +356,7 @@ export async function convertRecipientAction(
 ): Promise<ActionResult> {
   try {
     await requirePermission("lead.convert");
-    const actor = await requireReadableLead(leadId);
+    const { actor } = await requireReadableLead(leadId);
     const result = await (await import("@/lib/leads/application/convert")).convertRecipient(
       leadId,
       actor,
@@ -432,9 +432,7 @@ export async function listCounsellors() {
 export async function archiveLead(leadId: string): Promise<ActionResult> {
   try {
     const session = await requirePermission("lead.archive");
-    const actor = await requireReadableLead(leadId);
-    const before = await prisma.lead.findUnique({ where: { id: leadId } });
-    if (!before) return { ok: false, error: "Lead not found" };
+    const { actor, lead: before } = await requireReadableLead(leadId);
     if (before.status === LeadStatus.CONVERTED) {
       return { ok: false, error: "Converted leads cannot be archived" };
     }
@@ -456,7 +454,7 @@ export async function archiveLead(leadId: string): Promise<ActionResult> {
       action: "lead.archive",
       entityType: "Lead",
       entityId: leadId,
-      beforeJson: { status: before.status, tier: before.tier },
+      beforeJson: { status: before.status, tier: before.props.latestScore?.tier ?? null },
       afterJson: { status: LeadStatus.LOST, tier: LeadTier.ARCHIVED },
     });
     revalidatePath("/admin/leads");
@@ -471,9 +469,7 @@ export async function archiveLead(leadId: string): Promise<ActionResult> {
 export async function forcePurgeLead(leadId: string): Promise<ActionResult> {
   try {
     const session = await requirePermission("lead.purge");
-    await requireReadableLead(leadId);
-    const before = await prisma.lead.findUnique({ where: { id: leadId } });
-    if (!before) return { ok: false, error: "Lead not found" };
+    const { lead: before } = await requireReadableLead(leadId);
     if (before.status === LeadStatus.CONVERTED) {
       return { ok: false, error: "Converted leads cannot be purged" };
     }
@@ -495,10 +491,10 @@ export async function forcePurgeLead(leadId: string): Promise<ActionResult> {
       entityType: "Lead",
       entityId: leadId,
       afterJson: {
-        leadCode: before.leadCode,
-        score: before.score,
-        tier: before.tier,
-        source: before.source,
+        leadCode: before.code.toString(),
+        score: before.props.latestScore?.score ?? null,
+        tier: before.props.latestScore?.tier ?? null,
+        source: before.props.source,
         forced: true,
       },
     });

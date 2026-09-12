@@ -16,6 +16,10 @@ import {
 } from "@/lib/leads/adapters/prisma-lead-repository";
 import { resolveLeadActor } from "@/lib/leads/adapters/identity-adapter";
 import {
+  FUNNEL_CONTACTED_STATUSES,
+  FUNNEL_COUNSELLED_STATUSES,
+} from "@/lib/leads/application/funnel-status-groups";
+import {
   getSession,
   permissionGranted,
   permissionsForRoles,
@@ -51,8 +55,8 @@ export default async function AdminLeadsPage({
 
   const [newCount, contacted, counselled, converted] = await Promise.all([
     countScopedLeads(actor, { status: LeadStatus.NEW }),
-    countScopedLeads(actor, { status: LeadStatus.CONTACTED_QUALIFIED }),
-    countScopedLeads(actor, { status: LeadStatus.COUNSELLING_BOOKED }),
+    countScopedLeads(actor, { statuses: FUNNEL_CONTACTED_STATUSES }),
+    countScopedLeads(actor, { statuses: FUNNEL_COUNSELLED_STATUSES }),
     countScopedLeads(actor, { status: LeadStatus.CONVERTED }),
   ]);
 
