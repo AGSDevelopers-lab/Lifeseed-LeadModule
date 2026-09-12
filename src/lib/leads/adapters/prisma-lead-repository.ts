@@ -10,9 +10,15 @@ import type { LeadStatusHistory } from "../domain/entities/LeadStatusHistory";
 import { Lead } from "../domain/entities/Lead";
 import { LeadOwnershipDeniedError } from "../domain/errors";
 import { LeadStatus } from "../domain/enums";
-import type { LeadRepository } from "../domain/ports/LeadRepository";
+import type { LeadListFilters, LeadListPage, LeadRepository } from "../domain/ports/LeadRepository";
 import type { ActorContext } from "../domain/ports/shared";
-import { evaluateLeadAccess } from "./lead-access-scope";
+import {
+  decodeLeadCursor,
+  encodeLeadCursor,
+  evaluateLeadAccess,
+  leadListScopeWhere,
+  mergeLeadListFilters,
+} from "./lead-access-scope";
 import { activityToDomain } from "./mappers/activity-mapper";
 import { assignmentToDomain } from "./mappers/assignment-mapper";
 import { followUpToDomain } from "./mappers/follow-up-mapper";
@@ -46,6 +52,12 @@ export type LeadReadDb = {
       where: { id: string };
       include: typeof ACCESS_INCLUDE;
     }) => Promise<LeadAccessRow | null>;
+    findMany: (args: {
+      where: Record<string, unknown>;
+      include: typeof ACCESS_INCLUDE;
+      orderBy: [{ capturedAt: "desc" }, { id: "desc" }];
+      take: number;
+    }) => Promise<LeadAccessRow[]>;
   };
 };
 
@@ -95,6 +107,41 @@ export class PrismaLeadRepository implements LeadRepository {
     return toDomain(row);
   }
 
+  async list(actor: ActorContext, filters?: LeadListFilters): Promise<LeadListPage> {
+    const limit = Math.min(Math.max(filters?.limit ?? 50, 1), 200);
+    const scope = leadListScopeWhere(actor);
+    const where = mergeLeadListFilters(scope, filters);
+    const cursor = filters?.cursor ? decodeLeadCursor(filters.cursor) : null;
+    if (cursor) {
+      const AND = Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : [];
+      where.AND = [
+        ...AND,
+        {
+          OR: [
+            { capturedAt: { lt: cursor.capturedAt } },
+            { capturedAt: cursor.capturedAt, id: { lt: cursor.id } },
+          ],
+        },
+      ];
+    }
+    const rows = await this.db.lead.findMany({
+      where,
+      include: ACCESS_INCLUDE,
+      orderBy: [{ capturedAt: "desc" }, { id: "desc" }],
+      take: limit + 1,
+    });
+    const page = rows.slice(0, limit);
+    const extra = rows[limit];
+    const last = page[page.length - 1];
+    return {
+      items: page.map(toDomain),
+      nextCursor:
+        extra && last
+          ? encodeLeadCursor(last.capturedAt, last.id)
+          : null,
+    };
+  }
+
   async create(lead: Lead): Promise<Lead> {
     throw new Error(
       `PrismaLeadRepository.create is not implemented in B02 (${lead.id})`,
@@ -106,6 +153,39 @@ export class PrismaLeadRepository implements LeadRepository {
       `PrismaLeadRepository.update is not implemented in B02 (${lead.id})`,
     );
   }
+}
+
+export async function loadTelecallerQueue(
+  actor: ActorContext,
+  filters: { tier?: string; personType?: string },
+) {
+  const where = mergeLeadListFilters(leadListScopeWhere(actor), {
+    tier: filters.tier,
+    personType: filters.personType,
+  }) as Prisma.LeadWhereInput;
+  return prisma.lead.findMany({
+    where: {
+      ...where,
+      status: {
+        notIn: [
+          LeadStatus.CONVERTED,
+          LeadStatus.LOST,
+          LeadStatus.EXPIRED_AUTO_PURGED,
+          LeadStatus.DO_NOT_CALL,
+        ],
+      },
+    },
+    orderBy: [{ slaResponseDueAt: "asc" }, { tier: "asc" }],
+    take: 100,
+  });
+}
+
+export async function countScopedLeads(
+  actor: ActorContext,
+  extra: LeadListFilters = {},
+): Promise<number> {
+  const where = mergeLeadListFilters(leadListScopeWhere(actor), extra);
+  return prisma.lead.count({ where: where as Prisma.LeadWhereInput });
 }
 
 export const prismaLeadRepository = new PrismaLeadRepository();

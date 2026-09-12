@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { countLeadsWhere, groupLeadsBySource } from "@/lib/leads/adapters/prisma-lead-analytics";
 import { prisma } from "@/lib/db";
 import {
   getSession,
@@ -30,14 +31,9 @@ export default async function AdminLeadsAnalyticsPage() {
     redirect("/admin/leads");
   }
 
-  const bySource = await prisma.lead.groupBy({
-    by: ["source"],
-    _count: { _all: true },
-  });
-  const convertedBySource = await prisma.lead.groupBy({
-    by: ["source"],
-    where: { status: LeadStatus.CONVERTED },
-    _count: { _all: true },
+  const bySource = await groupLeadsBySource();
+  const convertedBySource = await groupLeadsBySource({
+    status: LeadStatus.CONVERTED,
   });
   const convMap = new Map(
     convertedBySource.map((r) => [r.source, r._count._all]),
@@ -52,12 +48,10 @@ export default async function AdminLeadsAnalyticsPage() {
     telecallers.map(async (t) => {
       const [calls, conversions] = await Promise.all([
         prisma.callDisposition.count({ where: { telecallerId: t.id } }),
-        prisma.lead.count({
-          where: {
+        countLeadsWhere({
             convertedByUserId: t.id,
             status: LeadStatus.CONVERTED,
-          },
-        }),
+          }),
       ]);
       return { email: t.email, calls, conversions };
     }),

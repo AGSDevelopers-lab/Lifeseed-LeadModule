@@ -10,7 +10,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { prisma } from "@/lib/db";
+import {
+  countScopedLeads,
+  prismaLeadRepository,
+} from "@/lib/leads/adapters/prisma-lead-repository";
+import { resolveLeadActor } from "@/lib/leads/adapters/identity-adapter";
 import {
   getSession,
   permissionGranted,
@@ -33,46 +37,23 @@ export default async function AdminLeadsPage({
     redirect("/admin");
   }
   const sp = await searchParams;
+  const actor = await resolveLeadActor();
+  if (!actor) redirect("/login");
 
-  const rows = await prisma.lead.findMany({
-    where: {
-      ...(sp.tier ? { tier: sp.tier as never } : {}),
-      ...(sp.status ? { status: sp.status as never } : {}),
-      ...(sp.source ? { source: sp.source as never } : {}),
-      ...(sp.personType ? { personType: sp.personType as never } : {}),
-    },
-    include: {
-      assignedTelecaller: { select: { email: true } },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 200,
+  const page = await prismaLeadRepository.list(actor, {
+    tier: sp.tier,
+    status: sp.status,
+    source: sp.source,
+    personType: sp.personType,
+    limit: 200,
   });
+  const rows = page.items;
 
   const [newCount, contacted, counselled, converted] = await Promise.all([
-    prisma.lead.count({
-      where: { status: { in: [LeadStatus.NEW, LeadStatus.ASSIGNED] } },
-    }),
-    prisma.lead.count({
-      where: {
-        status: {
-          in: [
-            LeadStatus.CONTACTED_QUALIFIED,
-            LeadStatus.CONTACTED_CALLBACK_REQUESTED,
-          ],
-        },
-      },
-    }),
-    prisma.lead.count({
-      where: {
-        status: {
-          in: [
-            LeadStatus.COUNSELLING_BOOKED,
-            LeadStatus.COUNSELLING_ATTENDED,
-          ],
-        },
-      },
-    }),
-    prisma.lead.count({ where: { status: LeadStatus.CONVERTED } }),
+    countScopedLeads(actor, { status: LeadStatus.NEW }),
+    countScopedLeads(actor, { status: LeadStatus.CONTACTED_QUALIFIED }),
+    countScopedLeads(actor, { status: LeadStatus.COUNSELLING_BOOKED }),
+    countScopedLeads(actor, { status: LeadStatus.CONVERTED }),
   ]);
 
   const canExport = permissionGranted(
@@ -135,16 +116,16 @@ export default async function AdminLeadsPage({
                     href={`/admin/leads/${r.id}`}
                     className="font-medium text-emerald-900 hover:underline"
                   >
-                    {r.leadCode}
+                    {r.code.toString()}
                   </Link>
                 </TableCell>
-                <TableCell>{r.fullName ?? "—"}</TableCell>
-                <TableCell className="text-xs">{r.personType}</TableCell>
-                <TableCell className="text-xs">{r.source}</TableCell>
-                <TableCell>{r.tier}</TableCell>
+                <TableCell>{r.props.contact.fullName ?? "—"}</TableCell>
+                <TableCell className="text-xs">{r.props.personType}</TableCell>
+                <TableCell className="text-xs">{r.props.source}</TableCell>
+                <TableCell>{r.props.latestScore?.tier ?? "—"}</TableCell>
                 <TableCell className="text-xs">{r.status}</TableCell>
                 <TableCell className="text-xs">
-                  {r.assignedTelecaller?.email ?? "—"}
+                  {r.props.ownership.assignedTelecallerId ?? "—"}
                 </TableCell>
               </TableRow>
             ))}

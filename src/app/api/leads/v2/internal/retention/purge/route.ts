@@ -8,15 +8,32 @@ import {
   permissionsForRoles,
 } from "@/lib/rbac";
 import {
-  authorizeLeadCronRequest,
+  authorizeLeadCronMachine,
   hmacCronUnauthorizedJson,
+  leadHmacCronEnforced,
 } from "@/lib/security/hmac-cron";
 
-/**
- * DPDP §8(7) erasure — delegates to SM T-30 (expire_by_retention).
- */
+function staticSecretFrom(req: NextRequest): string | null {
+  return (
+    req.headers.get("x-cron-secret") ??
+    (req.headers.get("authorization")?.startsWith("Bearer ")
+      ? req.headers.get("authorization")!.slice("Bearer ".length).trim()
+      : null)
+  );
+}
+
 export async function POST(req: NextRequest) {
-  const cron = await authorizeLeadCronRequest(req);
+  const body = await req.text();
+  const cron = authorizeLeadCronMachine({
+    hmacHeader:
+      req.headers.get("x-lifeseed-cron-signature") ??
+      req.headers.get("X-LifeSeed-Cron-Signature"),
+    staticHeader: staticSecretFrom(req),
+    body,
+    hmacSecret: process.env.LEADS_CRON_HMAC_SECRET,
+    staticSecret: process.env.LEADS_CRON_SECRET ?? process.env.CRON_SECRET,
+    mode: leadHmacCronEnforced(),
+  });
 
   if (!cron.ok) {
     if (!cron.allowSessionFallback) {
@@ -38,5 +55,5 @@ export async function POST(req: NextRequest) {
   }
 
   const summary = await tickRetentionPurge();
-  return NextResponse.json(summary);
+  return NextResponse.json({ ok: true, ...summary });
 }

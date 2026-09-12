@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { LeadStatus } from "@prisma/client";
 
 import { Button, Card, CardContent, CardHeader, CardTitle } from "@/components/ui/primitives";
+import { countScopedLeads } from "@/lib/leads/adapters/prisma-lead-repository";
+import { resolveLeadActor } from "@/lib/leads/adapters/identity-adapter";
 import { prisma } from "@/lib/db";
 import {
   getSession,
@@ -24,43 +26,15 @@ export default async function TelecallerDashboardPage() {
 
   const startOfDay = new Date();
   startOfDay.setUTCHours(0, 0, 0, 0);
-  const in2h = new Date(Date.now() + 2 * 3600_000);
+
+  const actor = await resolveLeadActor();
+  if (!actor) redirect("/login");
 
   const [open, breaching, convertedToday, calledToday, durations] =
     await Promise.all([
-      prisma.lead.count({
-        where: {
-          assignedTelecallerId: session.userId,
-          status: {
-            in: [
-              LeadStatus.ASSIGNED,
-              LeadStatus.CONTACTED_CALLBACK_REQUESTED,
-              LeadStatus.NOT_REACHABLE,
-              LeadStatus.NEW,
-            ],
-          },
-        },
-      }),
-      prisma.lead.count({
-        where: {
-          assignedTelecallerId: session.userId,
-          slaResponseDueAt: { lte: in2h },
-          status: {
-            notIn: [
-              LeadStatus.CONVERTED,
-              LeadStatus.LOST,
-              LeadStatus.EXPIRED_AUTO_PURGED,
-              LeadStatus.DO_NOT_CALL,
-            ],
-          },
-        },
-      }),
-      prisma.lead.count({
-        where: {
-          convertedByUserId: session.userId,
-          convertedAt: { gte: startOfDay },
-        },
-      }),
+      countScopedLeads(actor, { status: LeadStatus.ASSIGNED }),
+      countScopedLeads(actor),
+      countScopedLeads(actor, { status: LeadStatus.CONVERTED }),
       prisma.callDisposition.count({
         where: {
           telecallerId: session.userId,

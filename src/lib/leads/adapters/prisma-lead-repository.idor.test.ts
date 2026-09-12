@@ -57,12 +57,14 @@ function prismaRow(overrides: Record<string, unknown> = {}) {
 }
 
 function makeRepo(row: ReturnType<typeof prismaRow> | null, audit: LeadAccessAuditor) {
+  const findMany = vi.fn(async () => (row ? [row as never] : []));
   const db: LeadReadDb = {
     lead: {
       findUnique: vi.fn(async () => row as never),
+      findMany,
     },
   };
-  return new PrismaLeadRepository(db, audit);
+  return { repo: new PrismaLeadRepository(db, audit), findMany };
 }
 
 function fakeAudit(): LeadAccessAuditor & {
@@ -86,7 +88,7 @@ function fakeAudit(): LeadAccessAuditor & {
 describe("PrismaLeadRepository.byId IDOR", () => {
   it("refuses telecaller-A reading telecaller-B's lead and audits denial", async () => {
     const audit = fakeAudit();
-    const repo = makeRepo(prismaRow(), audit);
+    const { repo } = makeRepo(prismaRow(), audit);
     await expect(
       repo.byId("lead-b", {
         userId: "tele-a",
@@ -103,7 +105,7 @@ describe("PrismaLeadRepository.byId IDOR", () => {
 
   it("returns the lead for the assigned telecaller without a denial row", async () => {
     const audit = fakeAudit();
-    const repo = makeRepo(prismaRow(), audit);
+    const { repo } = makeRepo(prismaRow(), audit);
     const lead = await repo.byId("lead-b", {
       userId: "tele-b",
       roles: ["TELECALLER"],
@@ -115,7 +117,7 @@ describe("PrismaLeadRepository.byId IDOR", () => {
 
   it("returns null when the lead does not exist (no denial audit)", async () => {
     const audit = fakeAudit();
-    const repo = makeRepo(null, audit);
+    const { repo } = makeRepo(null, audit);
     await expect(
       repo.byId("missing", {
         userId: "tele-a",
@@ -123,5 +125,18 @@ describe("PrismaLeadRepository.byId IDOR", () => {
       }),
     ).resolves.toBeNull();
     expect(audit.denied).toHaveLength(0);
+  });
+
+  it("list omits other telecallers' leads at the query predicate", async () => {
+    const audit = fakeAudit();
+    const { repo, findMany } = makeRepo(prismaRow(), audit);
+    const page = await repo.list({
+      userId: "tele-a",
+      roles: ["TELECALLER"],
+      siteId: "site-kol",
+    });
+    expect(page.items).toHaveLength(1);
+    const arg = findMany.mock.calls[0][0] as { where: { assignedTelecallerId: string } };
+    expect(arg.where.assignedTelecallerId).toBe("tele-a");
   });
 });

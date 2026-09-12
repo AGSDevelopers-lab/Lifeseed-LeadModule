@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { prisma } from "@/lib/db";
+import { prismaLeadRepository } from "@/lib/leads/adapters/prisma-lead-repository";
+import { resolveLeadActor } from "@/lib/leads/adapters/identity-adapter";
 import {
   getSession,
   permissionGranted,
@@ -15,11 +16,13 @@ export async function GET() {
   if (!permissionGranted(permissionsForRoles(session.roles), "lead.export")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const actor = await resolveLeadActor();
+  if (!actor) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-  const rows = await prisma.lead.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 5000,
-  });
+  const page = await prismaLeadRepository.list(actor, { limit: 200 });
+  const rows = page.items;
 
   const headers = [
     "leadCode",
@@ -35,14 +38,14 @@ export async function GET() {
   for (const r of rows) {
     lines.push(
       [
-        r.leadCode,
-        r.personType,
-        r.source,
-        r.tier,
+        r.code.toString(),
+        r.props.personType,
+        r.props.source,
+        r.props.latestScore?.tier ?? "",
         r.status,
-        String(r.score),
-        csv(r.city ?? ""),
-        r.capturedAt.toISOString(),
+        String(r.props.latestScore?.score ?? ""),
+        csv(r.props.contact.city ?? ""),
+        r.props.retention.capturedAt.toISOString(),
       ].join(","),
     );
   }

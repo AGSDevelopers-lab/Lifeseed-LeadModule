@@ -8,6 +8,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
+import { countLeadsWhere } from "@/lib/leads/adapters/prisma-lead-analytics";
 import type { ReportCategory } from "@prisma/client";
 
 export type KpiValue = {
@@ -121,9 +122,11 @@ async function loadFinance() {
 async function loadLogistics() {
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const [leads, converted, dispatches, delivered] = await Promise.all([
-    prisma.lead.count({ where: { personType: "DONOR", capturedAt: { gte: since } } }),
-    prisma.lead.count({
-      where: { personType: "DONOR", status: LeadStatus.CONVERTED, capturedAt: { gte: since } },
+    countLeadsWhere({ personType: "DONOR", capturedAt: { gte: since } }),
+    countLeadsWhere({
+      personType: "DONOR",
+      status: LeadStatus.CONVERTED,
+      capturedAt: { gte: since },
     }),
     prisma.dispatchOrder.count({
       where: { createdAt: { gte: since } },

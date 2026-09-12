@@ -9,7 +9,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { prisma } from "@/lib/db";
+import { prismaLeadRepository } from "@/lib/leads/adapters/prisma-lead-repository";
+import { resolveLeadActor } from "@/lib/leads/adapters/identity-adapter";
 import {
   getSession,
   permissionGranted,
@@ -23,16 +24,11 @@ export default async function TelecallerLeadsListPage() {
     redirect("/telecaller/dashboard");
   }
 
-  const rows = await prisma.lead.findMany({
-    where: {
-      OR: [
-        { assignedTelecallerId: session.userId },
-        // OPS / admin with lead.list see all via admin portal
-      ],
-    },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
+  const actor = await resolveLeadActor();
+  if (!actor) redirect("/login");
+
+  const page = await prismaLeadRepository.list(actor, { limit: 100 });
+  const rows = page.items;
 
   return (
     <div className="space-y-6">
@@ -63,11 +59,11 @@ export default async function TelecallerLeadsListPage() {
                     href={`/telecaller/leads/${r.id}`}
                     className="text-emerald-900 hover:underline"
                   >
-                    {r.leadCode}
+                    {r.code.toString()}
                   </Link>
                 </TableCell>
-                <TableCell>{r.fullName}</TableCell>
-                <TableCell>{r.tier}</TableCell>
+                <TableCell>{r.props.contact.fullName}</TableCell>
+                <TableCell>{r.props.latestScore?.tier ?? "—"}</TableCell>
                 <TableCell className="text-xs">{r.status}</TableCell>
               </TableRow>
             ))}

@@ -1,3 +1,4 @@
+import type { LeadListFilters } from "../domain/ports/LeadRepository";
 import type { ActorContext } from "../domain/ports/shared";
 
 export type LeadAccessSnapshot = {
@@ -46,6 +47,9 @@ function isSiteScopedViewer(roles: Set<string>): boolean {
     roles.has("OPS_MANAGER") ||
     roles.has("MARKETING_MANAGER") ||
     roles.has("MARKETING_MGR") ||
+    // 05 §4.4 grants BANK_MED_DIR lead.view.any; Founder Q4 forbids case-level
+    // reads. Scope predicate keeps 05 until P0-2 STOP is resolved — do not
+    // silently drop or invent a filtered view permission.
     roles.has("BANK_MEDICAL_DIRECTOR") ||
     roles.has("MED_DIR") ||
     roles.has("CRM_ADMIN")
@@ -127,6 +131,74 @@ export function evaluateLeadAccess(
   return {
     allowed: false,
     denialReason: "PERMISSION_DENIED",
-    requiredPermission: "lead.view",
+    requiredPermission: "lead.view.own",
   };
+}
+
+/** Prisma `where` fragment for list queries — same ownership/site rules as byId. */
+export function leadListScopeWhere(ctx: ActorContext): Record<string, unknown> {
+  const roles = roleSet(ctx.roles);
+  if (isCrossSiteAdmin(roles)) {
+    return {};
+  }
+  if (isSiteScopedViewer(roles)) {
+    if (!ctx.siteId) return {};
+    return { assignedTelecaller: { siteId: ctx.siteId } };
+  }
+  if (roles.has("COUNSELLOR") && !isTelecaller(roles)) {
+    return { counsellingBooking: { is: { counsellorUserId: ctx.userId } } };
+  }
+  if (isTelecaller(roles)) {
+    return { assignedTelecallerId: ctx.userId };
+  }
+  if (roles.has("COUNSELLOR")) {
+    return { counsellingBooking: { is: { counsellorUserId: ctx.userId } } };
+  }
+  return { id: "__no_lead_scope__" };
+}
+
+export function mergeLeadListFilters(
+  scope: Record<string, unknown>,
+  filters: LeadListFilters | undefined,
+): Record<string, unknown> {
+  const where: Record<string, unknown> = { ...scope };
+  if (!filters) return where;
+  if (filters.source) where.source = filters.source;
+  if (filters.tier) where.tier = filters.tier;
+  if (filters.status) where.status = filters.status;
+  if (filters.outcome) where.outcome = filters.outcome;
+  if (filters.isArchived !== undefined) where.isArchived = filters.isArchived;
+  if (filters.personType) where.personType = filters.personType;
+  if (filters.campaignId) where.campaignId = filters.campaignId;
+  if (filters.telecallerId) where.assignedTelecallerId = filters.telecallerId;
+  if (filters.siteId) {
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+      { assignedTelecaller: { siteId: filters.siteId } },
+    ];
+  }
+  if (filters.from || filters.to) {
+    where.capturedAt = {
+      ...(filters.from ? { gte: filters.from } : {}),
+      ...(filters.to ? { lte: filters.to } : {}),
+    };
+  }
+  return where;
+}
+
+export function encodeLeadCursor(capturedAt: Date, id: string): string {
+  return Buffer.from(`${capturedAt.toISOString()}|${id}`, "utf8").toString("base64url");
+}
+
+export function decodeLeadCursor(cursor: string): { capturedAt: Date; id: string } | null {
+  try {
+    const raw = Buffer.from(cursor, "base64url").toString("utf8");
+    const idx = raw.lastIndexOf("|");
+    if (idx < 0) return null;
+    const capturedAt = new Date(raw.slice(0, idx));
+    if (Number.isNaN(capturedAt.getTime())) return null;
+    return { capturedAt, id: raw.slice(idx + 1) };
+  } catch {
+    return null;
+  }
 }

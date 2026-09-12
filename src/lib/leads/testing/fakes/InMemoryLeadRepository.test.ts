@@ -16,4 +16,12 @@ describe("InMemoryLeadRepository", () => {
     expect((await repo.byId("lead_rt"))?.status).toBe(LeadStatus.ASSIGNED);
     expect(updated.version).toBe(2);
   });
+
+  it("list scopes TELECALLER to assigned leads only", async () => {
+    const repo = new InMemoryLeadRepository();
+    await repo.create(aLead({ id: "a", assignedTelecallerId: "tele-a" }));
+    await repo.create(aLead({ id: "b", code: "LED-KOL-20260904-0002", assignedTelecallerId: "tele-b" }));
+    const page = await repo.list({ userId: "tele-a", roles: ["TELECALLER"] });
+    expect(page.items.map((l) => l.id)).toEqual(["a"]);
+  });
 });

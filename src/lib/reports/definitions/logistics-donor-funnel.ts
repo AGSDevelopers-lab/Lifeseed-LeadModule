@@ -3,6 +3,10 @@ import "server-only";
 import { LeadStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
+import {
+  groupLostReasons,
+  scanDonorFunnelLeads,
+} from "@/lib/leads/adapters/prisma-lead-analytics";
 import type { ReportDefinition, ReportFilters } from "@/lib/reports/types";
 
 type Stage = {
@@ -107,35 +111,12 @@ export const donorFunnelReport: ReportDefinition = {
     const { from, to } = parseDateRange(filters);
 
     const [leads, donors, lost] = await Promise.all([
-      prisma.lead.findMany({
-        where: {
-          personType: "DONOR",
-          capturedAt: { gte: from, lte: to },
-          status: { not: LeadStatus.EXPIRED_AUTO_PURGED },
-        },
-        select: {
-          status: true,
-          lostReason: true,
-          capturedAt: true,
-          convertedAt: true,
-          lastActivityAt: true,
-        },
-      }),
+      scanDonorFunnelLeads(from, to),
       prisma.donor.findMany({
         where: { createdAt: { gte: from, lte: to } },
         select: { phase: true, createdAt: true, updatedAt: true },
       }),
-      prisma.lead.groupBy({
-        by: ["lostReason"],
-        where: {
-          personType: "DONOR",
-          capturedAt: { gte: from, lte: to },
-          status: { in: [LeadStatus.LOST, LeadStatus.CONTACTED_NOT_INTERESTED] },
-        },
-        _count: { _all: true },
-        orderBy: { _count: { lostReason: "desc" } },
-        take: 1,
-      }),
+      groupLostReasons(from, to),
     ]);
 
     const topDrop =

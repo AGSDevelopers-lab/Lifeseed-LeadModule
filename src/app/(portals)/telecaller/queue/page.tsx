@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { LeadStatus, LeadTier } from "@prisma/client";
 
 import {
   Table,
@@ -10,7 +9,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { prisma } from "@/lib/db";
+import { loadTelecallerQueue } from "@/lib/leads/adapters/prisma-lead-repository";
+import { resolveLeadActor } from "@/lib/leads/adapters/identity-adapter";
 import {
   getSession,
   permissionGranted,
@@ -30,26 +30,13 @@ export default async function TelecallerQueuePage({
   ) {
     redirect("/telecaller/dashboard");
   }
+  const actor = await resolveLeadActor();
+  if (!actor) redirect("/login");
   const sp = await searchParams;
 
-  const rows = await prisma.lead.findMany({
-    where: {
-      assignedTelecallerId: session.userId,
-      status: {
-        notIn: [
-          LeadStatus.CONVERTED,
-          LeadStatus.LOST,
-          LeadStatus.EXPIRED_AUTO_PURGED,
-          LeadStatus.DO_NOT_CALL,
-        ],
-      },
-      ...(sp.tier ? { tier: sp.tier as LeadTier } : {}),
-      ...(sp.personType
-        ? { personType: sp.personType as "DONOR" | "RECIPIENT" }
-        : {}),
-    },
-    orderBy: [{ slaResponseDueAt: "asc" }, { tier: "asc" }],
-    take: 100,
+  const rows = await loadTelecallerQueue(actor, {
+    tier: sp.tier,
+    personType: sp.personType,
   });
 
   const now = Date.now();
