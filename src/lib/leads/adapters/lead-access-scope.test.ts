@@ -83,7 +83,7 @@ describe("IDOR matrix — lead outside actor scope", () => {
       denialReason: "PERMISSION_DENIED",
     },
     {
-      role: "SUPER_ADMIN",
+      role: "BANK_SUPER_ADMIN",
       userId: "root",
       siteId: "site-hyd",
       expectAllow: true,

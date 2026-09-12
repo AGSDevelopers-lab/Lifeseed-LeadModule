@@ -766,7 +766,6 @@ export function permissionGranted(
 /** 05 column MARKETING_MGR maps to Prisma `MARKETING_MANAGER`. */
 export function canonicalizeUserRole(role: string): UserRole {
   if (role === "MARKETING_MGR") return "MARKETING_MANAGER";
-  if (role === "SUPER_ADMIN") return "BANK_SUPER_ADMIN";
   return role as UserRole;
 }
 
