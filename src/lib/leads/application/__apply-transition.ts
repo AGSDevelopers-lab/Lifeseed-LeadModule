@@ -52,6 +52,8 @@ export type ApplyTransitionInput = {
   payload?: TransitionPayload;
   facts: GuardFacts;
   skipLoad?: boolean;
+  /** P0-5 T-21/T-30 ticks persist via persistBundle even when the SM flag is off. */
+  forcePersist?: boolean;
 };
 
 function logShadowDiscrepancy(
@@ -95,7 +97,9 @@ export async function applyTransition(
 
   const result = transition(lead, input.event, ctx);
 
-  if (!stateMachinePersistsSideEffects(mode) && lead) {
+  const persist =
+    stateMachinePersistsSideEffects(mode) || Boolean(input.forcePersist);
+  if (!persist && lead) {
     return { lead, result };
   }
 

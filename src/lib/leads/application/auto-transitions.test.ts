@@ -40,6 +40,7 @@ describe("P0-5 auto-transitions", () => {
       expect.objectContaining({
         leadId: "lead-1",
         event: "mark_lost",
+        forcePersist: true,
       }),
     );
   });
@@ -50,6 +51,7 @@ describe("P0-5 auto-transitions", () => {
     expect(expireLeadV2).toHaveBeenCalledWith(
       "lead-exp",
       expect.objectContaining({ roles: ["BANK_SUPER_ADMIN"] }),
+      { forcePersist: true },
     );
   });
 });

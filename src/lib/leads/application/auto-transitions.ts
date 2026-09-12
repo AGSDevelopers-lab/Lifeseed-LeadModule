@@ -33,7 +33,7 @@ export async function tickCounsellingNoShows(limit = 200): Promise<{
   transitioned: number;
 }> {
   const actor = await systemLeadActor();
-  const ids = await listLeadIdsByStatus(LeadStatus.COUNSELLING_NO_SHOW, limit);
+  const ids = await listLeadIdsByStatus(actor, LeadStatus.COUNSELLING_NO_SHOW, limit);
   let transitioned = 0;
   for (const leadId of ids) {
     const attemptCount = await countNoShowSessions(leadId);
@@ -49,6 +49,7 @@ export async function tickCounsellingNoShows(limit = 200): Promise<{
         maxAttempts: MAX_NO_SHOW_ATTEMPTS,
         reasonPresent: true,
       },
+      forcePersist: true,
     });
     transitioned += 1;
   }
@@ -67,18 +68,19 @@ export async function tickRetentionPurge(limit = 200): Promise<{ purged: number 
   const cutoff = new Date(now);
   cutoff.setUTCDate(cutoff.getUTCDate() - policy.leadUnconvertedDays);
   const ids = await listExpiredLeadIds(
+    actor,
     {
-      status: { not: LeadStatus.CONVERTED },
-      NOT: { status: LeadStatus.EXPIRED_AUTO_PURGED },
+      statusNot: LeadStatus.EXPIRED_AUTO_PURGED,
+      statusNotIn: [LeadStatus.CONVERTED],
       ...(mode === "off"
-        ? { retentionExpiresAt: { lte: now } }
-        : { capturedAt: { lte: cutoff } }),
+        ? { retentionExpiresAtTo: now }
+        : { to: cutoff }),
     },
     limit,
   );
   let purged = 0;
   for (const leadId of ids) {
-    await expireLeadV2(leadId, actor);
+    await expireLeadV2(leadId, actor, { forcePersist: true });
     purged += 1;
   }
   return { purged };

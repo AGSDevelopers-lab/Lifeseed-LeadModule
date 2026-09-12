@@ -70,6 +70,48 @@ describe("applyTransition double-write + rollback", () => {
     expect(store.history.at(-1)?.toStatus).toBe(stored?.status);
   });
 
+  it("forcePersist writes via persistBundle when SM flag is off (T-21/T-30 ticks)", async () => {
+    process.env.LEAD_STATE_MACHINE_ENABLED = "off";
+    process.env.NODE_ENV = "production";
+    process.env.VERCEL_ENV = "production";
+    const store = new InMemoryTransitionStore();
+    const lead = aLead({ status: LeadStatus.COUNSELLING_NO_SHOW });
+    store.seed(lead);
+    const { result } = await applyTransition(
+      { store, audit: new FakeAuditPort() },
+      {
+        leadId: lead.id,
+        event: LeadEvent.mark_lost,
+        actor: { userId: "sys", roles: ["BANK_SUPER_ADMIN"] },
+        payload: { reason: "exhausted_no_shows" },
+        facts: facts({ attemptCount: 3, maxAttempts: 3 }),
+        forcePersist: true,
+      },
+    );
+    expect(result.transitionId).toBe("T-21");
+    expect(result.nextStatus).toBe(LeadStatus.LOST);
+    expect((await store.load(lead.id))?.status).toBe(LeadStatus.LOST);
+  });
+
+  it("does not persist when SM flag is off and forcePersist is absent", async () => {
+    process.env.LEAD_STATE_MACHINE_ENABLED = "off";
+    process.env.NODE_ENV = "production";
+    process.env.VERCEL_ENV = "production";
+    const store = new InMemoryTransitionStore();
+    const lead = aLead({ status: LeadStatus.ASSIGNED });
+    store.seed(lead);
+    await applyTransition(
+      { store, audit: new FakeAuditPort() },
+      {
+        leadId: lead.id,
+        event: LeadEvent.expire_by_retention,
+        actor: { userId: "sys", roles: ["BANK_SUPER_ADMIN"] },
+        facts: facts(),
+      },
+    );
+    expect((await store.load(lead.id))?.status).toBe(LeadStatus.ASSIGNED);
+  });
+
   it("rolls back when persist throws mid-transition", async () => {
     process.env.LEAD_STATE_MACHINE_ENABLED = "on";
     const store = new InMemoryTransitionStore();

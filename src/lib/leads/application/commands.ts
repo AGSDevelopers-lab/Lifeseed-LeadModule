@@ -130,13 +130,18 @@ export async function reactivateLeadV2(leadId: string, actor: ActorContext, reas
   });
 }
 
-export async function expireLeadV2(leadId: string, actor: ActorContext) {
+export async function expireLeadV2(
+  leadId: string,
+  actor: ActorContext,
+  options?: { forcePersist?: boolean },
+) {
   return applyLeadEvent({
     leadId,
     event: LeadEvent.expire_by_retention,
     actor,
     permission: "lead.archive",
     facts: { retentionExpired: true, publicIntake: true, hasPermission: true },
+    forcePersist: options?.forcePersist,
   });
 }
 

@@ -14,6 +14,7 @@ export async function applyLeadEvent(input: {
   permission: string;
   payload?: TransitionPayload;
   facts?: Record<string, unknown>;
+  forcePersist?: boolean;
 }) {
   const lead = await prismaLeadRepository.byId(input.leadId, input.actor);
   if (!lead) throw new Error("Lead not found");
@@ -42,6 +43,7 @@ export async function applyLeadEvent(input: {
       actor: input.actor,
       payload: input.payload,
       facts,
+      forcePersist: input.forcePersist,
     },
   );
 }
