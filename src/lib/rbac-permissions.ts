@@ -519,6 +519,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "crm.sync.retry",
     "report.*",
   ],
+  // LADR-26 enum present; Lead grants are wired in a later commit (empty until then).
+  SR_TELECALLER: [],
   TELECALLER: [
     "telecaller.dashboard",
     "telecaller.queue",

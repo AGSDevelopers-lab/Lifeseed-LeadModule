@@ -18,6 +18,8 @@
 | `L2_EMBRYOLOGIST` | Clinic Portal (L2) | Own clinic | Denudation · fertilization · culture · grading |
 | `L2_SR_EMBRYOLOGIST` | Clinic Portal (L2) | Own clinic | Gate reviews · Gardner grading · vitrification approval |
 | `L2_LAB_HEAD` | Clinic Portal (L2) | Own clinic | Any gate · batch release |
+| `TELECALLER` | Telecaller Portal | Assigned leads | Lead contact · disposition · counselling book |
+| `SR_TELECALLER` | Telecaller Portal | Assigned / own pool | Senior telecaller (LADR-26); grants wired in Lead 05 §4.4 |
 
 ### Bank Admin (SetuAI operator)
 
