@@ -66,7 +66,21 @@ describe("IDOR matrix — lead outside actor scope", () => {
       userId: "med-1",
       siteId: "site-hyd",
       expectAllow: false,
-      denialReason: "SITE_SCOPE_VIOLATION",
+      denialReason: "PERMISSION_DENIED",
+    },
+    {
+      role: "BANK_MEDICAL_DIRECTOR",
+      userId: "med-1",
+      siteId: "site-kol",
+      expectAllow: false,
+      denialReason: "PERMISSION_DENIED",
+    },
+    {
+      role: "CRM_ADMIN",
+      userId: "crm-1",
+      siteId: "site-kol",
+      expectAllow: false,
+      denialReason: "PERMISSION_DENIED",
     },
     {
       role: "SUPER_ADMIN",

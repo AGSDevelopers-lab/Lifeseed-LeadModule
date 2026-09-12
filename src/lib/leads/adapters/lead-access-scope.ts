@@ -1,5 +1,9 @@
 import type { LeadListFilters } from "../domain/ports/LeadRepository";
 import type { ActorContext } from "../domain/ports/shared";
+import {
+  holdsLeadViewAny,
+  holdsLeadViewPermission,
+} from "@/lib/rbac-permissions";
 
 export type LeadAccessSnapshot = {
   leadId: string;
@@ -42,18 +46,9 @@ function isCrossSiteAdmin(roles: Set<string>): boolean {
   return roles.has("BANK_SUPER_ADMIN") || roles.has("SUPER_ADMIN");
 }
 
-function isSiteScopedViewer(roles: Set<string>): boolean {
-  return (
-    roles.has("OPS_MANAGER") ||
-    roles.has("MARKETING_MANAGER") ||
-    roles.has("MARKETING_MGR") ||
-    // 05 §4.4 grants BANK_MED_DIR lead.view.any; Founder Q4 forbids case-level
-    // reads. Scope predicate keeps 05 until P0-2 STOP is resolved — do not
-    // silently drop or invent a filtered view permission.
-    roles.has("BANK_MEDICAL_DIRECTOR") ||
-    roles.has("MED_DIR") ||
-    roles.has("CRM_ADMIN")
-  );
+function isSiteScopedViewer(ctx: ActorContext, roles: Set<string>): boolean {
+  if (isCrossSiteAdmin(roles)) return false;
+  return holdsLeadViewAny(ctx.roles);
 }
 
 function isTelecaller(roles: Set<string>): boolean {
@@ -68,8 +63,9 @@ function siteMatches(actorSiteId: string | null | undefined, leadSiteId: string 
 
 /**
  * Query-time ownership / site scope for Lead.byId.
- * SUPER_ADMIN is cross-site. OPS / marketing / medical director are site-scoped.
- * Telecallers (incl. SR_TELECALLER) see assigned leads only. Counsellors see booked leads only.
+ * BANK_SUPER_ADMIN is cross-site. Actors with `lead.view.any` (OPS / marketing)
+ * are site-scoped. Telecallers (incl. SR_TELECALLER) see assigned leads only.
+ * Counsellors see booked leads only. BANK_MEDICAL_DIRECTOR has no case-level view.
  */
 export function evaluateLeadAccess(
   lead: LeadAccessSnapshot,
@@ -77,11 +73,19 @@ export function evaluateLeadAccess(
 ): LeadAccessDecision {
   const roles = roleSet(ctx.roles);
 
+  if (!holdsLeadViewPermission(ctx.roles)) {
+    return {
+      allowed: false,
+      denialReason: "PERMISSION_DENIED",
+      requiredPermission: "lead.view.own",
+    };
+  }
+
   if (isCrossSiteAdmin(roles)) {
     return { allowed: true };
   }
 
-  if (isSiteScopedViewer(roles)) {
+  if (isSiteScopedViewer(ctx, roles)) {
     if (!siteMatches(ctx.siteId, lead.siteId)) {
       return {
         allowed: false,
@@ -138,10 +142,13 @@ export function evaluateLeadAccess(
 /** Prisma `where` fragment for list queries — same ownership/site rules as byId. */
 export function leadListScopeWhere(ctx: ActorContext): Record<string, unknown> {
   const roles = roleSet(ctx.roles);
+  if (!holdsLeadViewPermission(ctx.roles)) {
+    return { id: "__no_lead_scope__" };
+  }
   if (isCrossSiteAdmin(roles)) {
     return {};
   }
-  if (isSiteScopedViewer(roles)) {
+  if (isSiteScopedViewer(ctx, roles)) {
     if (!ctx.siteId) return {};
     return { assignedTelecaller: { siteId: ctx.siteId } };
   }

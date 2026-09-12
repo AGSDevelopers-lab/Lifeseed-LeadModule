@@ -6,6 +6,7 @@ import type {
 } from "../../domain/ports/LeadRepository";
 import { Lead } from "../../domain/entities/Lead";
 import { LeadOwnershipDeniedError } from "../../domain/errors";
+import { evaluateLeadAccess } from "../../adapters/lead-access-scope";
 
 export class InMemoryLeadRepository implements LeadRepository {
   private readonly byIdMap = new Map<string, Lead>();
@@ -13,18 +14,24 @@ export class InMemoryLeadRepository implements LeadRepository {
   async byId(id: string, ctx?: ActorContext): Promise<Lead | null> {
     const lead = this.byIdMap.get(id) ?? null;
     if (!lead) return null;
-    if (
-      ctx &&
-      ctx.roles.includes("TELECALLER") &&
-      !ctx.roles.includes("BANK_SUPER_ADMIN") &&
-      !ctx.roles.includes("OPS_MANAGER") &&
-      lead.props.ownership.assignedTelecallerId &&
-      lead.props.ownership.assignedTelecallerId !== ctx.userId
-    ) {
-      throw new LeadOwnershipDeniedError("Lead not in caller scope", {
-        leadId: id,
-        userId: ctx.userId,
-      });
+    if (ctx) {
+      const decision = evaluateLeadAccess(
+        {
+          leadId: lead.id,
+          assignedTelecallerId: lead.props.ownership.assignedTelecallerId,
+          counsellorUserId: null,
+          siteId: lead.props.ownership.siteId,
+        },
+        ctx,
+      );
+      if (!decision.allowed) {
+        throw new LeadOwnershipDeniedError("Lead not in caller scope", {
+          leadId: id,
+          userId: ctx.userId,
+          denialReason: decision.denialReason,
+          requiredPermission: decision.requiredPermission,
+        });
+      }
     }
     return lead;
   }

@@ -55,8 +55,12 @@ export async function GET(
     });
   } catch (err) {
     if (err instanceof LeadOwnershipDeniedError) {
+      const code =
+        typeof err.context.denialReason === "string"
+          ? err.context.denialReason
+          : "OWNERSHIP_DENIED";
       return NextResponse.json(
-        { error: { code: "OWNERSHIP_DENIED", message: "Lead not in caller scope" } },
+        { error: { code, message: "Lead not in caller scope" } },
         { status: 403 },
       );
     }

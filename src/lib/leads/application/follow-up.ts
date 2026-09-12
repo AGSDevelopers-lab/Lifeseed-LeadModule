@@ -23,6 +23,7 @@ import { CONFIG_KEYS } from "../config/keys";
 import { FakeClock } from "../testing/fakes/FakeClock";
 import { FakeIdGenerator } from "../testing/fakes/FakeIdGenerator";
 import { FakeSlaPort } from "../testing/fakes/FakeSlaPort";
+import { permissionGranted, permissionsForRoles } from "@/lib/rbac-permissions";
 
 const TERMINAL: ReadonlySet<FollowUpStatusT> = new Set([
   FollowUpStatus.COMPLETED,
@@ -73,7 +74,7 @@ export type FollowUpStore = {
 };
 
 export function canOverrideFollowUp(roles: readonly string[]): boolean {
-  return roles.includes("OPS_MANAGER") || roles.includes("BANK_SUPER_ADMIN");
+  return permissionGranted(permissionsForRoles(roles), "follow_up.update.any");
 }
 
 export function assertFollowUpAccess(

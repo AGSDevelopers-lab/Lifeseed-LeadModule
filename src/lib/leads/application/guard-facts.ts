@@ -1,14 +1,11 @@
 import { permissionGranted, permissionsForRoles, type Permission } from "@/lib/rbac";
-import type { UserRole } from "@prisma/client";
 import type { Lead } from "../domain/entities/Lead";
 import type { ActorContext } from "../domain/ports/shared";
 import { LeadStatus } from "../domain/enums";
 import type { GuardFacts } from "../domain/state-machine/types";
 
-const SUPERVISOR_ROLES = new Set(["OPS_MANAGER", "BANK_SUPER_ADMIN"]);
-
 export function isSupervisor(roles: readonly string[]): boolean {
-  return roles.some((r) => SUPERVISOR_ROLES.has(r));
+  return permissionGranted(permissionsForRoles(roles), "lead.convert.approve");
 }
 
 export function buildGuardFacts(input: {
@@ -91,6 +88,6 @@ export function mapWorkflowPermission(perm: string): string {
 
 export async function actorHasPerm(actor: ActorContext, workflowPerm: string): Promise<boolean> {
   const mapped = mapWorkflowPermission(workflowPerm) as Permission;
-  return permissionGranted(permissionsForRoles(actor.roles as UserRole[]), mapped);
+  return permissionGranted(permissionsForRoles(actor.roles), mapped);
 }
 

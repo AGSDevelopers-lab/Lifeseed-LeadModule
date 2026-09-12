@@ -139,4 +139,18 @@ describe("PrismaLeadRepository.byId IDOR", () => {
     const arg = findMany.mock.calls[0][0] as { where: { assignedTelecallerId: string } };
     expect(arg.where.assignedTelecallerId).toBe("tele-a");
   });
+
+  it("refuses BANK_MEDICAL_DIRECTOR case-level read (LADR-25)", async () => {
+    const audit = fakeAudit();
+    const { repo } = makeRepo(prismaRow(), audit);
+    await expect(
+      repo.byId("lead-b", {
+        userId: "md-1",
+        roles: ["BANK_MEDICAL_DIRECTOR"],
+        siteId: "site-kol",
+      }),
+    ).rejects.toMatchObject({
+      context: { denialReason: "PERMISSION_DENIED" },
+    });
+  });
 });

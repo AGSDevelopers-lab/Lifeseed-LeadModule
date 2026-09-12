@@ -61,24 +61,31 @@ describe("CONFLICT-30 HTTP two-actor IDOR (GET list/detail)", () => {
     vi.clearAllMocks();
   });
 
-  const viewRoles: Array<{ role: string; ownOk: boolean; otherCode: string }> = [
-    { role: "TELECALLER", ownOk: true, otherCode: "OWNERSHIP_DENIED" },
-    { role: "SR_TELECALLER", ownOk: false, otherCode: "PERMISSION_DENIED" },
-    { role: "COUNSELLOR", ownOk: true, otherCode: "OWNERSHIP_DENIED" },
-    { role: "OPS_MANAGER", ownOk: true, otherCode: "OWNERSHIP_DENIED" },
-    { role: "MARKETING_MANAGER", ownOk: true, otherCode: "OWNERSHIP_DENIED" },
-    { role: "MARKETING_MGR", ownOk: false, otherCode: "PERMISSION_DENIED" },
-    { role: "CRM_ADMIN", ownOk: true, otherCode: "OWNERSHIP_DENIED" },
-    { role: "BANK_SUPER_ADMIN", ownOk: true, otherCode: "OWNERSHIP_DENIED" },
-    { role: "BANK_MEDICAL_DIRECTOR", ownOk: false, otherCode: "PERMISSION_DENIED" },
+  const viewRoles: Array<{
+    role: string;
+    ownOk: boolean;
+    otherStatus: number;
+    otherCode?: string;
+  }> = [
+    { role: "TELECALLER", ownOk: true, otherStatus: 403, otherCode: "OWNERSHIP_DENIED" },
+    { role: "SR_TELECALLER", ownOk: true, otherStatus: 403, otherCode: "OWNERSHIP_DENIED" },
+    { role: "COUNSELLOR", ownOk: true, otherStatus: 403, otherCode: "OWNERSHIP_DENIED" },
+    { role: "OPS_MANAGER", ownOk: true, otherStatus: 200 },
+    { role: "MARKETING_MGR", ownOk: true, otherStatus: 200 },
+    { role: "CRM_ADMIN", ownOk: false, otherStatus: 403, otherCode: "PERMISSION_DENIED" },
+    { role: "BANK_SUPER_ADMIN", ownOk: true, otherStatus: 200 },
+    { role: "BANK_MEDICAL_DIRECTOR", ownOk: false, otherStatus: 403, otherCode: "PERMISSION_DENIED" },
   ];
 
   it.each(viewRoles)(
     "$role detail own vs other",
-    async ({ role, ownOk, otherCode }) => {
+    async ({ role, ownOk, otherStatus, otherCode }) => {
       resolveLeadActor.mockResolvedValue(actor(role, "user-1"));
       byId.mockImplementation(async (id: string) => {
-        if (id === OTHER && role !== "BANK_SUPER_ADMIN") {
+        if (
+          id === OTHER &&
+          (role === "TELECALLER" || role === "SR_TELECALLER" || role === "COUNSELLOR")
+        ) {
           throw new LeadOwnershipDeniedError("Lead not in caller scope", {
             leadId: id,
             userId: "user-1",
@@ -112,13 +119,11 @@ describe("CONFLICT-30 HTTP two-actor IDOR (GET list/detail)", () => {
       }
 
       const other = await detail(OTHER);
-      if (role === "BANK_SUPER_ADMIN") {
-        expect(other.status).toBe(200);
-        return;
+      expect(other.status).toBe(otherStatus);
+      if (otherStatus === 403 && otherCode) {
+        const otherJson = (await other.json()) as { error: { code: string } };
+        expect(otherJson.error.code).toBe(otherCode);
       }
-      expect(other.status).toBe(403);
-      const otherJson = (await other.json()) as { error: { code: string } };
-      expect(otherJson.error.code).toBe(otherCode);
     },
   );
 
@@ -132,10 +137,15 @@ describe("CONFLICT-30 HTTP two-actor IDOR (GET list/detail)", () => {
     );
   });
 
-  it("ROLE_PERMISSIONS still has no lead.convert.approve (BATCH 3)", () => {
+  it("lead.convert.approve is granted only to OPS_MANAGER and BANK_SUPER_ADMIN", () => {
     const roles = Object.keys(ROLE_PERMISSIONS) as UserRole[];
     for (const r of roles) {
-      expect(ROLE_PERMISSIONS[r].includes("lead.convert.approve")).toBe(false);
+      const granted = ROLE_PERMISSIONS[r].includes("lead.convert.approve");
+      if (r === "OPS_MANAGER" || r === "BANK_SUPER_ADMIN") {
+        expect(granted).toBe(true);
+      } else {
+        expect(granted).toBe(false);
+      }
     }
   });
 });

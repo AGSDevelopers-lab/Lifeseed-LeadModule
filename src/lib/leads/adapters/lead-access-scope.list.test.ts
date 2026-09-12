@@ -32,4 +32,36 @@ describe("leadListScopeWhere (P0-1)", () => {
       leadListScopeWhere({ userId: "x", roles: ["BANK_FINANCE"] }),
     ).toEqual({ id: "__no_lead_scope__" });
   });
+
+  it("returns empty-scope sentinel for BANK_MEDICAL_DIRECTOR (LADR-25)", () => {
+    expect(
+      leadListScopeWhere({
+        userId: "md",
+        roles: ["BANK_MEDICAL_DIRECTOR"],
+        siteId: "s1",
+      }),
+    ).toEqual({ id: "__no_lead_scope__" });
+  });
+
+  it("returns empty-scope sentinel for CRM_ADMIN (no case-level view)", () => {
+    expect(
+      leadListScopeWhere({ userId: "crm", roles: ["CRM_ADMIN"], siteId: "s1" }),
+    ).toEqual({ id: "__no_lead_scope__" });
+  });
+
+  it("site-scopes MARKETING_MGR via MARKETING_MANAGER mapping", () => {
+    expect(
+      leadListScopeWhere({
+        userId: "mkt",
+        roles: ["MARKETING_MGR"],
+        siteId: "s1",
+      }),
+    ).toEqual({ assignedTelecaller: { siteId: "s1" } });
+  });
+
+  it("scopes SR_TELECALLER to assigneeId", () => {
+    expect(
+      leadListScopeWhere({ userId: "sr", roles: ["SR_TELECALLER"], siteId: "s1" }),
+    ).toEqual({ assignedTelecallerId: "sr" });
+  });
 });

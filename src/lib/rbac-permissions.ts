@@ -395,6 +395,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "seedscore.view",
     "seedscore.override.tier",
     "lead.config.view",
+    "analytics.view",
+    "audit.view",
     "report.list",
     "report.view.clinical",
     "report.view.regulatory",
@@ -478,12 +480,33 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "seedscore.override.tier",
     "lead.list",
     "lead.view",
+    "lead.view.any",
+    "lead.view.own",
+    "lead.view.assigned_for_counselling",
+    "lead.view.for_own_clinic",
     "lead.create",
+    "lead.intake",
+    "lead.intake.api",
     "lead.assign",
+    "lead.reassign",
+    "lead.claim",
     "lead.convert",
+    "lead.convert.donor",
+    "lead.convert.recipient",
+    "lead.convert.approve",
     "lead.archive",
+    "lead.unarchive",
+    "lead.reactivate",
+    "lead.merge",
+    "lead.edit.limited",
     "lead.purge",
     "lead.export",
+    "duplicate.review",
+    "assignment.override",
+    "analytics.view",
+    "audit.view",
+    "audit.export",
+    "audit.integrity.verify",
     "lead.config.view",
     "lead.config.propose",
     "lead.config.approve",
@@ -519,16 +542,49 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "crm.sync.retry",
     "report.*",
   ],
-  // LADR-26 enum present; Lead grants are wired in a later commit (empty until then).
-  SR_TELECALLER: [],
   TELECALLER: [
     "telecaller.dashboard",
     "telecaller.queue",
     "telecaller.disposition",
     "telecaller.book_counselling",
     "lead.view",
+    "lead.view.own",
     "lead.create",
+    "lead.edit.limited",
+    "lead.claim",
     "lead.convert",
+    "lead.convert.donor",
+    "lead.convert.recipient",
+    "counselling.book",
+    "donor.create",
+    "lead.disposition",
+    "lead.note.add",
+    "follow_up.create",
+    "follow_up.update.own",
+    "follow_up.complete.own",
+    "follow_up.cancel.own",
+    "follow_up.reschedule",
+    "follow_up.list",
+    "dnc.list",
+    "dnc.view",
+    "dnc.check",
+    "dnc.add",
+  ],
+  SR_TELECALLER: [
+    "telecaller.dashboard",
+    "telecaller.queue",
+    "telecaller.disposition",
+    "telecaller.book_counselling",
+    "lead.view",
+    "lead.view.own",
+    "lead.create",
+    "lead.edit.limited",
+    "lead.claim",
+    "lead.reassign",
+    "lead.reactivate",
+    "lead.convert",
+    "lead.convert.donor",
+    "lead.convert.recipient",
     "counselling.book",
     "donor.create",
     "lead.disposition",
@@ -549,6 +605,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "counsellor.sessions",
     "counsellor.mark_attended",
     "lead.view",
+    "lead.view.assigned_for_counselling",
+    "lead.edit.limited",
+    "lead.convert.recipient",
+    "counselling.session.record",
+    "counselling.outcome.record",
     "lead.note.add",
     "follow_up.create",
     "follow_up.update.own",
@@ -571,11 +632,28 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "counsellor.mark_attended",
     "lead.list",
     "lead.view",
+    "lead.view.any",
     "lead.create",
+    "lead.intake",
+    "lead.edit.limited",
     "lead.assign",
+    "lead.reassign",
+    "lead.claim",
     "lead.convert",
+    "lead.convert.donor",
+    "lead.convert.recipient",
+    "lead.convert.approve",
     "lead.archive",
+    "lead.unarchive",
+    "lead.reactivate",
+    "lead.merge",
+    "lead.export",
+    "duplicate.review",
+    "assignment.override",
+    "analytics.view",
+    "audit.view",
     "ops.qa_sample",
+    "qa.sample",
     "dnc.list",
     "dnc.view",
     "dnc.check",
@@ -597,6 +675,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "counselling.book",
     "counselling.reschedule",
     "counselling.cancel",
+    "counselling.session.record",
+    "counselling.outcome.record",
     "donor.create",
     "report.list",
     "report.view.*",
@@ -610,11 +690,22 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "marketing.analytics",
     "lead.list",
     "lead.view",
+    "lead.view.any",
     "lead.export",
     "dnc.view",
     "lead.config.view",
     "lead.config.propose",
     "lead.config.approve",
+    "campaign.view",
+    "campaign.create",
+    "campaign.edit",
+    "campaign.activate",
+    "campaign.end",
+    "analytics.view",
+    "audit.view",
+    "notification.template.propose",
+    "notification.template.approve",
+    "notification.log.view",
     "report.list",
     "report.view.logistics",
     "report.view.operational",
@@ -624,9 +715,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   CRM_ADMIN: [
     "crm.sync.manual",
     "crm.sync.retry",
-    "lead.list",
-    "lead.view",
+    "crm.sync.monitor",
     "lead.config.view",
+    "audit.view",
   ],
   L2_IVF_CLINICIAN: [
     "cycle_event.log",
@@ -672,8 +763,36 @@ export function permissionGranted(
   return false;
 }
 
-export function permissionsForRoles(roles: UserRole[]): Permission[] {
-  return [...new Set(roles.flatMap((role) => ROLE_PERMISSIONS[role] ?? []))];
+/** 05 column MARKETING_MGR maps to Prisma `MARKETING_MANAGER`. */
+export function canonicalizeUserRole(role: string): UserRole {
+  if (role === "MARKETING_MGR") return "MARKETING_MANAGER";
+  if (role === "SUPER_ADMIN") return "BANK_SUPER_ADMIN";
+  return role as UserRole;
+}
+
+export function permissionsForRoles(roles: UserRole[] | readonly string[]): Permission[] {
+  return [
+    ...new Set(
+      roles.flatMap((role) => ROLE_PERMISSIONS[canonicalizeUserRole(role)] ?? []),
+    ),
+  ];
+}
+
+export function holdsLeadViewPermission(roles: readonly string[]): boolean {
+  const held = permissionsForRoles(roles);
+  return (
+    permissionGranted(held, "lead.view.any") ||
+    permissionGranted(held, "lead.view.own") ||
+    permissionGranted(held, "lead.view.assigned_for_counselling") ||
+    permissionGranted(held, "lead.view.for_own_clinic") ||
+    permissionGranted(held, "lead.view") ||
+    permissionGranted(held, "lead.list")
+  );
+}
+
+export function holdsLeadViewAny(roles: readonly string[]): boolean {
+  const held = permissionsForRoles(roles);
+  return permissionGranted(held, "lead.view.any") || permissionGranted(held, "lead.list");
 }
 
 export type PortalKind =
@@ -687,7 +806,7 @@ export type PortalKind =
 export function portalForRole(role: UserRole): PortalKind {
   if (role === "DONOR") return "donor";
   if (role === "RECIPIENT") return "recipient";
-  if (role === "TELECALLER") return "telecaller";
+  if (role === "TELECALLER" || role === "SR_TELECALLER") return "telecaller";
   if (role === "COUNSELLOR") return "counsellor";
   if (role.startsWith("CLINIC_") || role.startsWith("L2_")) return "clinic";
   return "admin";
