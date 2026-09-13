@@ -75,6 +75,12 @@ export const assignmentRulesSchema = z.object({
   maxQueuePerTelecaller: z.number().int().positive(),
   autoAssignEnabled: z.boolean(),
   openStatuses: z.array(z.string()),
+  /** Site matching for v2 assignment. IAM shift/skill/language remain deferred. */
+  siteMatchingPolicy: z.enum(["require_match", "off"]).default("require_match"),
+  /** Cross-site assignment requires the existing assignment.override permission. */
+  crossSiteOverridePolicy: z.enum(["assignment_override", "deny"]).default("assignment_override"),
+  /** Fair rotation within the implemented bucket (site + capacity + active eligibility). */
+  rotationStrategy: z.enum(["least_open_then_user_id"]).default("least_open_then_user_id"),
 });
 
 export const followUpPolicySchema = z.object({

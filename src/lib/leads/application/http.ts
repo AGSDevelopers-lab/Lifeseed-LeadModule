@@ -24,7 +24,7 @@ const bodySchema = z.object({
 const EVENT_PERM: Partial<Record<LeadEventName, string>> = {
   intake: "lead.create",
   assign: "lead.assign",
-  reassign: "lead.assign",
+  reassign: "lead.reassign",
   claim: "telecaller.disposition",
   disposition_qualified: "telecaller.disposition",
   disposition_not_interested: "telecaller.disposition",

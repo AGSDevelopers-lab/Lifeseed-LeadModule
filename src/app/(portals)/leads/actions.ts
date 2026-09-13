@@ -328,7 +328,10 @@ export async function reassignLead(
   try {
     const session = await requirePermission("lead.assign");
     await requireReadableLead(leadId);
-    await assignLead(leadId, session.userId, telecallerId);
+    await assignLead(leadId, session.userId, telecallerId, {
+      roles: session.roles,
+      siteId: session.siteId,
+    });
     revalidatePath("/admin/leads");
     revalidatePath(`/admin/leads/${leadId}`);
     revalidatePath(`/telecaller/leads/${leadId}`);

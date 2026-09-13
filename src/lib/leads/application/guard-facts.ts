@@ -75,7 +75,6 @@ export function mapWorkflowPermission(perm: string): string {
     "lead.intake": "lead.create",
     "lead.disposition": "telecaller.disposition",
     "lead.claim": "telecaller.disposition",
-    "lead.reassign": "lead.assign",
     "lead.unarchive": "lead.archive",
     "lead.reactivate": "lead.archive",
     "lead.merge": "lead.assign",

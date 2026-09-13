@@ -112,6 +112,9 @@ export const DEFAULT_ASSIGNMENT_RULES: AssignmentRules = {
     LeadStatus.NOT_REACHABLE,
     LeadStatus.COUNSELLING_BOOKED,
   ],
+  siteMatchingPolicy: "require_match",
+  crossSiteOverridePolicy: "assignment_override",
+  rotationStrategy: "least_open_then_user_id",
 };
 
 export const DEFAULT_FOLLOW_UP_POLICY = { defaultDueHours: 24 };

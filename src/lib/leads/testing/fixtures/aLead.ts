@@ -16,6 +16,7 @@ export function aLead(overrides: Partial<{
   status: LeadStatus;
   personType: LeadPersonType;
   assignedTelecallerId: string | null;
+  siteId: string | null;
 }> = {}): Lead {
   return new Lead({
     id: overrides.id ?? "lead_1",
@@ -32,7 +33,7 @@ export function aLead(overrides: Partial<{
     latestScore: new TierScore(40, LeadTier.COLD, "SCORE_WEIGHTS_V1@1", new Date("2026-09-04T00:00:00.000Z")),
     latestScoreId: null,
     ownership: {
-      siteId: null,
+      siteId: overrides.siteId ?? null,
       assignedTelecallerId: overrides.assignedTelecallerId ?? null,
       activeAssignmentId: null,
     },

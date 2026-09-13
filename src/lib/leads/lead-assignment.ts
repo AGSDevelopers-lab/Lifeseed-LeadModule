@@ -8,13 +8,18 @@ import {
   countAssignedOpenLeads,
   prismaLeadRepository,
 } from "@/lib/leads/adapters/prisma-lead-repository";
+import { lookupUserSiteAndActive } from "@/lib/leads/adapters/prisma-assignment-directory";
 import { resolveConfigPayload } from "@/lib/leads/application/config-store";
+import { pickV2Assignee } from "@/lib/leads/application/assignment-eligibility";
+import { assertSrTelecallerOwnPool } from "@/lib/leads/application/assignment-policy";
 import {
   getLeadStateMachineMode,
+  isLeadAssignmentV2Enabled,
   stateMachinePersistsSideEffects,
 } from "@/lib/leads/application/feature-flag";
 import { DEFAULT_ASSIGNMENT_RULES } from "@/lib/leads/config/defaults";
 import { CONFIG_KEYS } from "@/lib/leads/config/keys";
+import type { ActorContext } from "@/lib/leads/domain/ports/shared";
 
 async function assignmentRules() {
   const envCap = Number(process.env.LEADS_MAX_QUEUE_PER_TELECALLER ?? "20");
@@ -41,13 +46,29 @@ export async function assignLead(
   leadId: string,
   actorId?: string | null,
   forceUserId?: string,
+  actorCtx?: Pick<ActorContext, "roles" | "siteId">,
 ): Promise<string | null> {
   if (forceUserId) {
+    if (actorCtx?.roles?.length) {
+      const target = await lookupUserSiteAndActive(forceUserId);
+      assertSrTelecallerOwnPool(
+        {
+          userId: actorId ?? forceUserId,
+          roles: actorCtx.roles,
+          siteId: actorCtx.siteId,
+        },
+        target?.siteId ?? null,
+      );
+    }
     if (stateMachinePersistsSideEffects(getLeadStateMachineMode())) {
       const { assignLeadToUser, reassignLeadToUser } = await import(
         "@/lib/leads/application/commands"
       );
-      const actor = { userId: actorId ?? forceUserId, roles: ["OPS_MANAGER"] };
+      const actor = {
+        userId: actorId ?? forceUserId,
+        roles: actorCtx?.roles?.length ? [...actorCtx.roles] : ["OPS_MANAGER"],
+        siteId: actorCtx?.siteId,
+      };
       const existing = await prismaLeadRepository.byId(leadId, actor);
       if (existing?.status === LeadStatus.ASSIGNED) {
         await reassignLeadToUser(leadId, actor, forceUserId, "manual reassign");
@@ -69,6 +90,35 @@ export async function assignLead(
       afterJson: { assignedTelecallerId: forceUserId, forced: true },
     });
     return forceUserId;
+  }
+
+  if (isLeadAssignmentV2Enabled()) {
+    const actor: ActorContext = {
+      userId: actorId ?? "system",
+      roles: ["SYSTEM", "OPS_MANAGER"],
+      siteId: actorCtx?.siteId,
+    };
+    const existing = await prismaLeadRepository.byId(leadId, actor);
+    const chosen = await pickV2Assignee(existing?.props.ownership.siteId ?? null, actor);
+    if (!chosen) return null;
+    if (stateMachinePersistsSideEffects(getLeadStateMachineMode())) {
+      const { assignLeadToUser } = await import("@/lib/leads/application/commands");
+      await assignLeadToUser(leadId, actor, chosen);
+    } else {
+      await applyAuthorizedLeadStatus(leadId, LeadStatus.ASSIGNED, {
+        assignedTelecallerId: chosen,
+        assignedAt: new Date(),
+        lastActivityAt: new Date(),
+      });
+    }
+    await audit.log({
+      actorUserId: actorId ?? null,
+      action: "lead.assign",
+      entityType: "Lead",
+      entityId: leadId,
+      afterJson: { assignedTelecallerId: chosen, path: "assignment_v2" },
+    });
+    return chosen;
   }
 
   const rules = await assignmentRules();

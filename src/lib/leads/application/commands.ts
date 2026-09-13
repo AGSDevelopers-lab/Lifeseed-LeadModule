@@ -30,13 +30,23 @@ export async function assignLeadToUser(
   assigneeUserId: string,
   payload: TransitionPayload = {},
 ) {
+  const {
+    assertExplicitAssigneeAllowed,
+    computeGenuineAssigneeAvailable,
+    loadLeadForAssignment,
+  } = await import("./assignment-eligibility");
+  const lead = await loadLeadForAssignment(leadId, actor);
+  if (!lead) throw new Error("Lead not found");
+  await assertExplicitAssigneeAllowed(actor, assigneeUserId, lead, "assign");
+  // Temporary fallback semantics pending IAM Module 12 — not a final availability model.
+  const assigneeAvailable = await computeGenuineAssigneeAvailable(lead, actor);
   return applyLeadEvent({
     leadId,
     event: LeadEvent.assign,
     actor,
     permission: "lead.assign",
     payload: { ...payload, assigneeUserId },
-    facts: { assigneeAvailable: true },
+    facts: { assigneeAvailable },
   });
 }
 
@@ -46,13 +56,23 @@ export async function reassignLeadToUser(
   assigneeUserId: string,
   reason: string,
 ) {
+  const {
+    assertExplicitAssigneeAllowed,
+    computeGenuineAssigneeAvailable,
+    loadLeadForAssignment,
+  } = await import("./assignment-eligibility");
+  const lead = await loadLeadForAssignment(leadId, actor);
+  if (!lead) throw new Error("Lead not found");
+  await assertExplicitAssigneeAllowed(actor, assigneeUserId, lead, "reassign");
+  // Temporary fallback semantics pending IAM Module 12 — not a final availability model.
+  const assigneeAvailable = await computeGenuineAssigneeAvailable(lead, actor);
   return applyLeadEvent({
     leadId,
     event: LeadEvent.reassign,
     actor,
     permission: "lead.reassign",
     payload: { assigneeUserId, reason },
-    facts: { assigneeAvailable: true, reasonPresent: true },
+    facts: { assigneeAvailable, reasonPresent: true },
   });
 }
 

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { getLeadStateMachineMode, getLeadNotificationPortMode, isLeadConversionPortEnabled, isLeadFollowUpEnabled, isLeadOutboxEnabled, isLeadSmsEnabled, isLeadEmailEnabled, isLeadWhatsappEnabled } from "./feature-flag";
+import { getLeadStateMachineMode, getLeadNotificationPortMode, isLeadAssignmentV2Enabled, isLeadConversionPortEnabled, isLeadFollowUpEnabled, isLeadOutboxEnabled, isLeadSmsEnabled, isLeadEmailEnabled, isLeadWhatsappEnabled } from "./feature-flag";
 import { getLeadConfigMode } from "../config/flag";
 
 const env = { ...process.env };
@@ -75,6 +75,14 @@ describe("LEAD_CONFIG_ENABLED", () => {
   it("defaults to partial outside production", () => {
     delete process.env.LEAD_CONFIG_ENABLED;
     expect(getLeadConfigMode({ NODE_ENV: "development" })).toBe("partial");
+  });
+});
+
+describe("LEAD_ASSIGNMENT_V2_ENABLED", () => {
+  it("defaults off unless the exact value on is set", () => {
+    delete process.env.LEAD_ASSIGNMENT_V2_ENABLED;
+    expect(isLeadAssignmentV2Enabled({})).toBe(false);
+    expect(isLeadAssignmentV2Enabled({ LEAD_ASSIGNMENT_V2_ENABLED: "on" })).toBe(true);
   });
 });
 

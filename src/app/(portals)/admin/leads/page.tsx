@@ -88,6 +88,9 @@ export default async function AdminLeadsPage({
           <Link href="/admin/leads/config" className="text-emerald-900 hover:underline">
             Config
           </Link>
+          <Link href="/admin/leads/assignment" className="text-emerald-900 hover:underline">
+            Assignment
+          </Link>
           <Link href="/admin/leads/notifications/templates" className="text-emerald-900 hover:underline">
             Templates
           </Link>
