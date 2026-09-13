@@ -20,13 +20,15 @@ B13 ships a fallback `AssignmentDirectory` using only existing `User.siteId`, `U
 
 ## C. Implementation commit SHA(s)
 
-See section D (filled after git commit).
+- `46bb4721afefc0aa3209d4530c9afe416bde0f4c` — `feat(lead-v2.1): B13 fallback assignment with site, capacity, and genuine availability`
 
 ---
 
 ## D. Ending HEAD / branch
 
-See git commit output in this session; branch remains `main` (no push).
+- **Branch:** `main`
+- **Implementation commit:** `46bb4721afefc0aa3209d4530c9afe416bde0f4c`
+- **No push to origin.**
 
 ---
 
