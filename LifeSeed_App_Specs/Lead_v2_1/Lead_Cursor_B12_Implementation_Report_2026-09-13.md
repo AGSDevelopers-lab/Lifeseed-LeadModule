@@ -11,7 +11,9 @@
 
 ## Ending
 
-Recorded in git after this report is committed (see `git log -1`).
+- Branch: `main`
+- HEAD: `f2f52ba023117f7ac082557ef905aa8e1eddec6c`
+- Implementation commit: `f2f52ba feat(lead-v2.1): B12 mock-only notification adapters, webhooks, and template surfaces`
 
 ## Classification
 
