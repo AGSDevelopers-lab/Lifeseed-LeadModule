@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { getLeadStateMachineMode, getLeadNotificationPortMode, isLeadAssignmentV2Enabled, isLeadConversionPortEnabled, isLeadDuplicateEnabled, isLeadFollowUpEnabled, isLeadOutboxEnabled, isLeadSmsEnabled, isLeadEmailEnabled, isLeadWhatsappEnabled } from "./feature-flag";
+import { getLeadStateMachineMode, getLeadNotificationPortMode, isLeadAssignmentV2Enabled, isLeadAttributionEnabled, isLeadConversionPortEnabled, isLeadDuplicateEnabled, isLeadFollowUpEnabled, isLeadOutboxEnabled, isLeadSmsEnabled, isLeadEmailEnabled, isLeadWhatsappEnabled } from "./feature-flag";
 import { getLeadConfigMode } from "../config/flag";
 
 const env = { ...process.env };
@@ -91,6 +91,14 @@ describe("LEAD_DUPLICATE_ENABLED", () => {
     delete process.env.LEAD_DUPLICATE_ENABLED;
     expect(isLeadDuplicateEnabled({})).toBe(false);
     expect(isLeadDuplicateEnabled({ LEAD_DUPLICATE_ENABLED: "on" })).toBe(true);
+  });
+});
+
+describe("LEAD_ATTRIBUTION_ENABLED", () => {
+  it("defaults off unless the exact value on is set", () => {
+    delete process.env.LEAD_ATTRIBUTION_ENABLED;
+    expect(isLeadAttributionEnabled({})).toBe(false);
+    expect(isLeadAttributionEnabled({ LEAD_ATTRIBUTION_ENABLED: "on" })).toBe(true);
   });
 });
 

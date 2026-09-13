@@ -81,3 +81,17 @@ export class LeadInvariantViolationError extends LeadDomainError {
     this.name = "LeadInvariantViolationError";
   }
 }
+
+export class LeadPermissionDeniedError extends LeadDomainError {
+  constructor(message: string, context: LeadErrorContext = {}) {
+    super("LEAD_PERMISSION_DENIED", message, context);
+    this.name = "LeadPermissionDeniedError";
+  }
+}
+
+export class CampaignIllegalTransitionError extends LeadDomainError {
+  constructor(message: string, context: LeadErrorContext = {}) {
+    super("CAMPAIGN_ILLEGAL_TRANSITION", message, context);
+    this.name = "CampaignIllegalTransitionError";
+  }
+}

@@ -111,6 +111,15 @@ export function isLeadDuplicateEnabled(env: NodeJS.ProcessEnv = process.env): bo
   return (env.LEAD_DUPLICATE_ENABLED ?? process.env.LEAD_DUPLICATE_ENABLED) === "on";
 }
 
+/**
+ * B15 attribution capture. Default OFF.
+ * Gates captureTouch on intake only — Campaign CRUD and CAC are RBAC-gated, not flag-gated.
+ * Never activate for production without Founder cutover.
+ */
+export function isLeadAttributionEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return (env.LEAD_ATTRIBUTION_ENABLED ?? process.env.LEAD_ATTRIBUTION_ENABLED) === "on";
+}
+
 export type LeadFollowUpMode = "off" | "on";
 
 /**

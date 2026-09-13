@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { countLeadsWhere, groupLeadsBySource } from "@/lib/leads/adapters/prisma-lead-analytics";
 import { resolveLeadActor } from "@/lib/leads/adapters/identity-adapter";
+import { computeCampaignCac } from "@/lib/leads/application/attribution";
 import { prisma } from "@/lib/db";
 import {
   getSession,
@@ -62,6 +63,13 @@ export default async function AdminLeadsAnalyticsPage() {
   );
   leaderboard.sort((a, b) => b.conversions - a.conversions);
 
+  const canAnalytics = permissionGranted(permissionsForRoles(session.roles), "analytics.view");
+  const cacDonor = canAnalytics
+    ? await computeCampaignCac({ actor, scope: "donor" })
+    : [];
+  const cacRecipient = canAnalytics
+    ? await computeCampaignCac({ actor, scope: "recipient" })
+    : [];
   const breached = await prisma.slaSchedule.count({
     where: { status: "BREACHED", entityType: "LEAD_RESPONSE" },
   });
@@ -88,12 +96,47 @@ export default async function AdminLeadsAnalyticsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-sm text-stone-500">
-              CAC placeholders
+              CAC (last-touch, INR)
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-stone-600">
-            CAC per active donor / registered recipient requires marketing spend
-            input (not wired in v1).
+            {canAnalytics ? (
+              <div className="space-y-3">
+                <p className="text-xs text-stone-500">
+                  CAC = actualSpendInr / last-touch attributed leads. Zero leads → null.
+                </p>
+                <div>
+                  <p className="font-medium text-stone-800">Donor</p>
+                  {cacDonor.length === 0 ? (
+                    <p>No campaigns.</p>
+                  ) : (
+                    <ul className="mt-1 space-y-1">
+                      {cacDonor.map((r) => (
+                        <li key={`d-${r.campaignId}`}>
+                          {r.code}: {r.cac == null ? "—" : r.cac.toFixed(2)} INR ({r.leadCount} leads)
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div>
+                  <p className="font-medium text-stone-800">Recipient</p>
+                  {cacRecipient.length === 0 ? (
+                    <p>No campaigns.</p>
+                  ) : (
+                    <ul className="mt-1 space-y-1">
+                      {cacRecipient.map((r) => (
+                        <li key={`r-${r.campaignId}`}>
+                          {r.code}: {r.cac == null ? "—" : r.cac.toFixed(2)} INR ({r.leadCount} leads)
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p>Requires analytics.view.</p>
+            )}
           </CardContent>
         </Card>
       </div>

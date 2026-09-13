@@ -102,6 +102,14 @@ export async function persistNewLead(input: CreateLeadInput) {
     },
   });
 
+  const { isLeadAttributionEnabled } = await import("@/lib/leads/application/feature-flag");
+  if (isLeadAttributionEnabled()) {
+    const { captureTouch, touchInputFromLeadCreate } = await import(
+      "@/lib/leads/application/attribution"
+    );
+    await captureTouch(touchInputFromLeadCreate(lead));
+  }
+
   await scheduleLeadSlaForTier(lead.id, scored.tier, capturedAt);
   await enqueue(CrmEntityType.LEAD, lead.id, undefined, {
     leadCode,
