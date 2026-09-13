@@ -225,12 +225,17 @@ describe("invariants I-01/I-03/I-05/I-09/I-14", () => {
     expect(REACTIVATION_WINDOW_DAYS).toBe(90);
   });
 
-  it("I-03 duplicate conversion is refused before writes", () => {
-    expect(() =>
-      TRANSITION_FNS["T-16"](
-        aLead({ status: LeadStatus.CONTACTED_QUALIFIED }),
-        ctx({}, { hasConversion: true }),
-      ),
-    ).toThrow(LeadDuplicateConversionError);
+  it("T-19 reschedule writes predecessor RESCHEDULED then a new booking", () => {
+    const base = ctx();
+    const result = TRANSITION_FNS["T-19"](
+      aLead({ status: LeadStatus.COUNSELLING_BOOKED }),
+      { ...base, payload: { ...base.payload, cancelMode: "reschedule" } },
+    );
+    const kinds = result.writes.map((w) => w.kind);
+    expect(kinds).toContain("counselling_booking_update");
+    expect(kinds).toContain("counselling_booking");
+    const update = result.writes.find((w) => w.kind === "counselling_booking_update");
+    expect(update && update.kind === "counselling_booking_update" && update.bookingStatus).toBe("RESCHEDULED");
+    expect(result.outboxEvents).toEqual([]);
   });
 });

@@ -37,7 +37,7 @@ export default async function CounsellorSessionsPage() {
               href={`/counsellor/sessions/${r.id}`}
               className="text-sm text-emerald-900 hover:underline"
             >
-              {r.lead.leadCode} · {r.status} ·{" "}
+              {r.lead.leadCode} · {r.status} · {r.bookingStatus} ·{" "}
               {r.scheduledAt.toISOString().slice(0, 16)}
             </Link>
           </li>

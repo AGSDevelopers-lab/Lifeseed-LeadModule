@@ -74,3 +74,15 @@ export function isLeadFollowUpEnabled(env: NodeJS.ProcessEnv = process.env): boo
   }
   return true;
 }
+
+/**
+ * UI/product rollout for counselling history/calendar vs legacy single-booking UI.
+ * Default ON. Must not gate authoritative counselling writes.
+ */
+export function isLeadCounsellingHistoryEnabled(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  const raw = env.LEAD_COUNSELLING_HISTORY_ENABLED;
+  if (raw === "off") return false;
+  return true;
+}

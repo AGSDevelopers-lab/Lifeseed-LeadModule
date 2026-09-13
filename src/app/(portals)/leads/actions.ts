@@ -2,11 +2,9 @@
 
 import {
   CallDispositionType,
-  CounsellingBookingStatus,
   CounsellingMode,
   LeadStatus,
   LeadTier,
-  SlaEntityType,
   UserRole,
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -25,8 +23,6 @@ import {
 } from "@/lib/leads/application/feature-flag";
 import { assignLead } from "@/lib/leads/lead-assignment";
 import { requirePermission } from "@/lib/rbac";
-import { scheduleSla } from "@/lib/sla/engine";
-import { SLA_DEFINITIONS } from "@/lib/sla/definitions";
 
 export type ActionResult =
   | { ok: true; id?: string }
@@ -199,84 +195,20 @@ export async function bookCounselling(
       d.durationMinutes ??
       Number(process.env.COUNSELLING_DEFAULT_DURATION_MIN ?? "30");
 
-    if (stateMachinePersistsSideEffects(getLeadStateMachineMode())) {
-      await (await import("@/lib/leads/application/counselling")).bookCounsellingSession(
-        d.leadId,
-        actor,
-        {
-          counsellorUserId: d.counsellorUserId,
-          scheduledAt: new Date(d.scheduledAt),
-          mode: d.mode,
-          meetingUrl: d.meetingUrl ?? null,
-          meetingLocation: d.meetingLocation ?? null,
-          durationMinutes: duration,
-        },
-      );
-      revalidatePath(`/telecaller/leads/${d.leadId}`);
-      return { ok: true };
-    }
-
-    const booking = await prisma.counsellingBooking.upsert({
-      where: { leadId: d.leadId },
-      create: {
-        leadId: d.leadId,
+    await (await import("@/lib/leads/application/counselling")).bookCounsellingSession(
+      d.leadId,
+      actor,
+      {
         counsellorUserId: d.counsellorUserId,
         scheduledAt: new Date(d.scheduledAt),
         mode: d.mode,
         meetingUrl: d.meetingUrl ?? null,
         meetingLocation: d.meetingLocation ?? null,
         durationMinutes: duration,
-        status: CounsellingBookingStatus.BOOKED,
       },
-      update: {
-        counsellorUserId: d.counsellorUserId,
-        scheduledAt: new Date(d.scheduledAt),
-        mode: d.mode,
-        meetingUrl: d.meetingUrl ?? null,
-        meetingLocation: d.meetingLocation ?? null,
-        durationMinutes: duration,
-        status: CounsellingBookingStatus.BOOKED,
-        cancelledAt: null,
-        cancelledReason: null,
-      },
-    });
-
-    await applyAuthorizedLeadStatus(d.leadId, LeadStatus.COUNSELLING_BOOKED, {
-      lastActivityAt: new Date(),
-    });
-
-    const scheduled = new Date(d.scheduledAt);
-    const rem24 = new Date(scheduled.getTime() - 24 * 3600_000);
-    const rem2 = new Date(scheduled.getTime() - 2 * 3600_000);
-    if (rem24 > new Date()) {
-      await scheduleSla(
-        booking.id,
-        SlaEntityType.COUNSELLING_REMINDER,
-        "counselling_reminder_24h",
-        rem24,
-        SLA_DEFINITIONS.counselling_reminder_24h,
-      ).catch(() => undefined);
-    }
-    if (rem2 > new Date()) {
-      await scheduleSla(
-        booking.id,
-        SlaEntityType.COUNSELLING_REMINDER,
-        "counselling_reminder_2h",
-        rem2,
-        SLA_DEFINITIONS.counselling_reminder_2h,
-      ).catch(() => undefined);
-    }
-
-    await audit.log({
-      actorUserId: session.userId,
-      action: "counselling.book",
-      entityType: "CounsellingBooking",
-      entityId: booking.id,
-      afterJson: { leadId: d.leadId, scheduledAt: d.scheduledAt },
-    });
-
+    );
     revalidatePath(`/telecaller/leads/${d.leadId}`);
-    return { ok: true, id: booking.id };
+    return { ok: true };
   } catch (e) {
     return catchErr(e);
   }
@@ -288,30 +220,19 @@ export async function markCounsellingSession(
   notes?: string,
 ): Promise<ActionResult> {
   try {
-    const session = await requirePermission("counsellor.mark_attended");
-    const booking = await prisma.counsellingBooking.update({
+    await requirePermission("counselling.session.record");
+    const actor = await resolveLeadActor();
+    if (!actor) return { ok: false, error: "Unauthorized" };
+    const booking = await prisma.counsellingBooking.findUnique({
       where: { id: bookingId },
-      data: {
-        status:
-          status === "ATTENDED"
-            ? CounsellingBookingStatus.ATTENDED
-            : CounsellingBookingStatus.NO_SHOW,
-        attendedAt: status === "ATTENDED" ? new Date() : null,
-        followupNotes: notes ?? undefined,
-      },
     });
-    await applyAuthorizedLeadStatus(
+    if (!booking) return { ok: false, error: "Booking not found" };
+    await (await import("@/lib/leads/application/counselling")).recordCounsellingSession(
       booking.leadId,
-      status === "ATTENDED" ? LeadStatus.COUNSELLING_ATTENDED : LeadStatus.COUNSELLING_NO_SHOW,
-      { lastActivityAt: new Date() },
+      actor,
+      status === "ATTENDED" ? "attended" : "no_show",
+      { notes },
     );
-    await audit.log({
-      actorUserId: session.userId,
-      action: "counsellor.mark",
-      entityType: "CounsellingBooking",
-      entityId: bookingId,
-      afterJson: { status },
-    });
     revalidatePath(`/counsellor/sessions/${bookingId}`);
     return { ok: true };
   } catch (e) {

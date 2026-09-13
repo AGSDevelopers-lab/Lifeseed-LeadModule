@@ -199,6 +199,7 @@ export class PrismaLeadTransitionStore implements TransitionStore {
       await tx.lead.update({ where: { id: leadId }, data: patch });
 
       let latestHistoryToStatus: string | null = null;
+      let lastRescheduledBookingId: string | null = null;
       for (const write of input.writes) {
         switch (write.kind) {
           case "status_history": {
@@ -400,36 +401,57 @@ export class PrismaLeadTransitionStore implements TransitionStore {
             }
             break;
           }
-          case "counselling_booking":
-            await tx.counsellingBooking.upsert({
-              where: { leadId },
-              create: {
-                leadId,
-                counsellorUserId: write.counsellorUserId,
-                scheduledAt: write.scheduledAt,
-                mode: write.mode as never,
-                meetingUrl: write.meetingUrl ?? null,
-                meetingLocation: write.meetingLocation ?? null,
-                durationMinutes: write.durationMinutes ?? 30,
-                status: CounsellingBookingStatus.BOOKED,
-                bookingStatus: BookingStatus.SCHEDULED,
-              },
-              update: {
-                counsellorUserId: write.counsellorUserId,
-                scheduledAt: write.scheduledAt,
-                mode: write.mode as never,
-                meetingUrl: write.meetingUrl ?? null,
-                meetingLocation: write.meetingLocation ?? null,
-                durationMinutes: write.durationMinutes ?? 30,
-                status: CounsellingBookingStatus.BOOKED,
-                bookingStatus: BookingStatus.SCHEDULED,
-                cancelledAt: null,
-                cancelledReason: null,
-              },
+          case "counselling_booking": {
+            const existingScheduled = await tx.counsellingBooking.findFirst({
+              where: { leadId, bookingStatus: BookingStatus.SCHEDULED },
             });
+            if (existingScheduled) {
+              throw new LeadInvariantViolationError(
+                "At most one SCHEDULED counselling booking per Lead",
+                { invariant: "B11_ONE_SCHEDULED", leadId },
+              );
+            }
+            try {
+              await tx.counsellingBooking.create({
+                data: {
+                  leadId,
+                  counsellorUserId: write.counsellorUserId,
+                  scheduledAt: write.scheduledAt,
+                  mode: write.mode as never,
+                  meetingUrl: write.meetingUrl ?? null,
+                  meetingLocation: write.meetingLocation ?? null,
+                  durationMinutes: write.durationMinutes ?? 30,
+                  status: CounsellingBookingStatus.BOOKED,
+                  bookingStatus: BookingStatus.SCHEDULED,
+                  rescheduledFromBookingId: lastRescheduledBookingId,
+                },
+              });
+            } catch (err) {
+              if (
+                typeof err === "object" &&
+                err &&
+                "code" in err &&
+                (err as { code: string }).code === "P2002"
+              ) {
+                throw new LeadInvariantViolationError(
+                  "At most one SCHEDULED counselling booking per Lead",
+                  { invariant: "B11_ONE_SCHEDULED", leadId, concurrent: true },
+                );
+              }
+              throw err;
+            }
             break;
+          }
           case "counselling_booking_update": {
-            const booking = await tx.counsellingBooking.findUnique({ where: { leadId } });
+            const booking =
+              (await tx.counsellingBooking.findFirst({
+                where: { leadId, bookingStatus: BookingStatus.SCHEDULED },
+                orderBy: { createdAt: "desc" },
+              })) ??
+              (await tx.counsellingBooking.findFirst({
+                where: { leadId },
+                orderBy: { createdAt: "desc" },
+              }));
             if (booking) {
               await tx.counsellingBooking.update({
                 where: { id: booking.id },
@@ -442,11 +464,23 @@ export class PrismaLeadTransitionStore implements TransitionStore {
                   attendedAt: write.legacyStatus === "ATTENDED" ? input.now : undefined,
                 },
               });
+              if (write.bookingStatus === "RESCHEDULED") {
+                lastRescheduledBookingId = booking.id;
+              }
             }
             break;
           }
           case "counselling_session": {
-            const booking = await tx.counsellingBooking.findUnique({ where: { leadId } });
+            const booking = write.bookingId
+              ? await tx.counsellingBooking.findUnique({ where: { id: write.bookingId } })
+              : (await tx.counsellingBooking.findFirst({
+                  where: { leadId, bookingStatus: BookingStatus.SCHEDULED },
+                  orderBy: { createdAt: "desc" },
+                })) ??
+                (await tx.counsellingBooking.findFirst({
+                  where: { leadId },
+                  orderBy: { createdAt: "desc" },
+                }));
             if (booking) {
               await tx.counsellingSession.create({
                 data: {
@@ -468,6 +502,7 @@ export class PrismaLeadTransitionStore implements TransitionStore {
               orderBy: { recordedAt: "desc" },
             });
             if (session) {
+              try {
               await tx.counsellingOutcome.create({
                 data: {
                   sessionId: session.id,
@@ -477,6 +512,20 @@ export class PrismaLeadTransitionStore implements TransitionStore {
                   rationale: write.rationale ?? null,
                 },
               });
+              } catch (err) {
+                if (
+                  typeof err === "object" &&
+                  err &&
+                  "code" in err &&
+                  (err as { code: string }).code === "P2002"
+                ) {
+                  throw new LeadInvariantViolationError(
+                    "CounsellingOutcome is create-once per session",
+                    { invariant: "B11_OUTCOME_IMMUTABLE", leadId, sessionId: session.id },
+                  );
+                }
+                throw err;
+              }
             }
             break;
           }
@@ -567,7 +616,7 @@ export class PrismaLeadTransitionStore implements TransitionStore {
       const lead = await tx.lead.findUniqueOrThrow({ where: { id: leadId } });
       const domainLead = leadToDomain({
         ...lead,
-        counsellingBooking: null,
+        counsellingBookings: [],
         assignedTelecaller: null,
       });
       return {

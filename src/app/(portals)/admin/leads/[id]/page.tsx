@@ -246,14 +246,18 @@ export default async function AdminLeadDetailPage({
       <Card>
         <CardHeader><CardTitle className="text-base">Counselling booking</CardTitle></CardHeader>
         <CardContent className="text-sm">
-          {!lead.counsellingBooking ? (
+          {!lead.counsellingBookings?.length ? (
             <p className="text-stone-500">No counselling booked</p>
           ) : (
-            <div className="space-y-1">
-              <p>Scheduled: {ist(lead.counsellingBooking.scheduledAt)}</p>
-              <p>Mode: {lead.counsellingBooking.mode}</p>
-              <p>Counsellor: {lead.counsellingBooking.counsellor.email}</p>
-              <p>Status: {lead.counsellingBooking.status}</p>
+            <div className="space-y-3">
+              {lead.counsellingBookings.map((b) => (
+                <div key={b.id} className="space-y-1 border-b border-stone-100 pb-2 last:border-0">
+                  <p>Scheduled: {ist(b.scheduledAt)}</p>
+                  <p>Mode: {b.mode}</p>
+                  <p>Counsellor: {b.counsellor.email}</p>
+                  <p>Status: {b.bookingStatus} / {b.status}</p>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>

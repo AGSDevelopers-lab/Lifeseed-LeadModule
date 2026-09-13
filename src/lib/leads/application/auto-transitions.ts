@@ -7,13 +7,19 @@ import {
   listExpiredLeadIds,
   listLeadIdsByStatus,
 } from "@/lib/leads/adapters/prisma-lead-analytics";
+import {
+  listOverdueScheduledBookings,
+  listReminderCandidates,
+  markReminderSent,
+} from "@/lib/leads/adapters/prisma-counselling";
+import { createPrismaNotificationPort } from "@/lib/leads/adapters/notification/notification-port";
 import { resolveConfigPayload } from "@/lib/leads/application/config-store";
 import { expireLeadV2 } from "@/lib/leads/application/commands";
 import { applyLeadEvent } from "@/lib/leads/application/apply-lead-event";
 import { DEFAULT_RETENTION_POLICY } from "@/lib/leads/config/defaults";
 import { CONFIG_KEYS } from "@/lib/leads/config/keys";
 import { getLeadConfigMode } from "@/lib/leads/config/flag";
-import { LeadEvent } from "@/lib/leads/domain/enums";
+import { LeadEvent, NotificationChannel } from "@/lib/leads/domain/enums";
 import type { ActorContext } from "@/lib/leads/domain/ports/shared";
 import { resolveSystemUserId } from "@/lib/leads/application/backfill-lead-conversions";
 
@@ -31,8 +37,55 @@ export async function systemLeadActor(): Promise<ActorContext> {
 export async function tickCounsellingNoShows(limit = 200): Promise<{
   scanned: number;
   transitioned: number;
+  noShows: number;
+  reminders: number;
 }> {
   const actor = await systemLeadActor();
+  const now = new Date();
+  const overdue = await listOverdueScheduledBookings(now, 15 * 60_000, limit);
+  let noShows = 0;
+  for (const row of overdue) {
+    await applyLeadEvent({
+      leadId: row.leadId,
+      event: LeadEvent.session_no_show,
+      actor,
+      permission: "counselling.session.record",
+      payload: { notes: "tick_grace_no_show" },
+      facts: { bookingExists: true },
+      forcePersist: true,
+    });
+    noShows += 1;
+  }
+
+  const { due24, due2 } = await listReminderCandidates(now);
+  let reminders = 0;
+  const port = await createPrismaNotificationPort();
+  const sent = new Set<string>();
+  for (const booking of due24) {
+    await port.send({
+      channel: NotificationChannel.IN_APP,
+      templateKey: "counselling_reminder_24h",
+      recipient: booking.counsellorUserId,
+      data: { bookingId: booking.id, scheduledAt: booking.scheduledAt.toISOString() },
+      leadId: booking.leadId,
+    });
+    await markReminderSent(booking.id, now);
+    sent.add(booking.id);
+    reminders += 1;
+  }
+  for (const booking of due2) {
+    if (sent.has(booking.id)) continue;
+    await port.send({
+      channel: NotificationChannel.IN_APP,
+      templateKey: "counselling_reminder_2h",
+      recipient: booking.counsellorUserId,
+      data: { bookingId: booking.id, scheduledAt: booking.scheduledAt.toISOString() },
+      leadId: booking.leadId,
+    });
+    await markReminderSent(booking.id, now);
+    reminders += 1;
+  }
+
   const ids = await listLeadIdsByStatus(actor, LeadStatus.COUNSELLING_NO_SHOW, limit);
   let transitioned = 0;
   for (const leadId of ids) {
@@ -53,7 +106,12 @@ export async function tickCounsellingNoShows(limit = 200): Promise<{
     });
     transitioned += 1;
   }
-  return { scanned: ids.length, transitioned };
+  return {
+    scanned: ids.length + overdue.length,
+    transitioned,
+    noShows,
+    reminders,
+  };
 }
 
 export async function tickRetentionPurge(limit = 200): Promise<{ purged: number }> {

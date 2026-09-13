@@ -50,7 +50,7 @@ function prismaRow(overrides: Record<string, unknown> = {}) {
     mergedIntoLeadId: null,
     duplicateOfLeadId: null,
     version: 1,
-    counsellingBooking: null,
+    counsellingBookings: [],
     assignedTelecaller: { siteId: "site-kol" },
     ...overrides,
   };

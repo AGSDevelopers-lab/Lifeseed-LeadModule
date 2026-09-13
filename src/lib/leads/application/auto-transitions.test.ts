@@ -18,6 +18,14 @@ vi.mock("@/lib/leads/adapters/prisma-lead-analytics", () => ({
   countNoShowSessions: vi.fn(async () => 3),
   listExpiredLeadIds: vi.fn(async () => ["lead-exp"]),
 }));
+vi.mock("@/lib/leads/adapters/prisma-counselling", () => ({
+  listOverdueScheduledBookings: vi.fn(async () => [{ id: "b1", leadId: "lead-ns", scheduledAt: new Date() }]),
+  listReminderCandidates: vi.fn(async () => ({ due24: [], due2: [] })),
+  markReminderSent: vi.fn(async () => undefined),
+}));
+vi.mock("@/lib/leads/adapters/notification/notification-port", () => ({
+  createPrismaNotificationPort: vi.fn(async () => ({ send: vi.fn(async () => ({ blocked: false, deliveryId: "d1" })) })),
+}));
 vi.mock("@/lib/leads/application/apply-lead-event", () => ({
   applyLeadEvent: vi.fn(async () => ({ lead: null, result: { transitionId: "T-21" } })),
 }));
@@ -36,6 +44,13 @@ describe("P0-5 auto-transitions", () => {
   it("routes counselling no-show exhaustion through SM mark_lost (T-21)", async () => {
     const summary = await tickCounsellingNoShows();
     expect(summary.transitioned).toBe(1);
+    expect(applyLeadEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        leadId: "lead-ns",
+        event: "session_no_show",
+        forcePersist: true,
+      }),
+    );
     expect(applyLeadEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         leadId: "lead-1",

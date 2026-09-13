@@ -32,17 +32,17 @@ import {
 } from "./prisma-audit";
 
 type AccessInclude = {
-  counsellingBooking: { select: { counsellorUserId: true } };
+  counsellingBookings: { select: { counsellorUserId: true } };
   assignedTelecaller: { select: { siteId: true } };
 };
 
 type LeadAccessRow = PrismaLead & {
-  counsellingBooking: { counsellorUserId: string } | null;
+  counsellingBookings: Array<{ counsellorUserId: string }>;
   assignedTelecaller: { siteId: string | null } | null;
 };
 
 const ACCESS_INCLUDE = {
-  counsellingBooking: { select: { counsellorUserId: true } },
+  counsellingBookings: { select: { counsellorUserId: true } },
   assignedTelecaller: { select: { siteId: true } },
 } satisfies AccessInclude;
 
@@ -83,7 +83,8 @@ export class PrismaLeadRepository implements LeadRepository {
       {
         leadId: row.id,
         assignedTelecallerId: row.assignedTelecallerId,
-        counsellorUserId: row.counsellingBooking?.counsellorUserId ?? null,
+        counsellorUserId: row.counsellingBookings[0]?.counsellorUserId ?? null,
+        counsellorUserIds: row.counsellingBookings.map((b) => b.counsellorUserId),
         siteId: row.assignedTelecaller?.siteId ?? null,
       },
       ctx,
@@ -220,7 +221,7 @@ export const prismaLeadRepository = new PrismaLeadRepository();
 
 const TELECALLER_DETAIL_INCLUDE = {
   callDispositions: { orderBy: { createdAt: "desc" as const }, take: 20 },
-  counsellingBooking: true,
+  counsellingBookings: true,
 } satisfies Prisma.LeadInclude;
 
 const ADMIN_DETAIL_INCLUDE = {
@@ -229,7 +230,7 @@ const ADMIN_DETAIL_INCLUDE = {
     orderBy: { createdAt: "desc" as const },
     include: { telecaller: { select: { email: true } } },
   },
-  counsellingBooking: { include: { counsellor: { select: { email: true } } } },
+  counsellingBookings: { include: { counsellor: { select: { email: true } } } },
   convertedDonor: { select: { id: true, donorCode: true } },
 } satisfies Prisma.LeadInclude;
 

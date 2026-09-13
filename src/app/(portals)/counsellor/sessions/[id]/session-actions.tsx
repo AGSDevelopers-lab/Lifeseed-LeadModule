@@ -30,7 +30,7 @@ export function SessionActions({
     router.refresh();
   }
 
-  if (status !== "BOOKED") {
+  if (status !== "BOOKED" && status !== "SCHEDULED") {
     return (
       <p className="text-sm text-stone-500">Session already {status}</p>
     );

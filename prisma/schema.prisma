@@ -1876,7 +1876,7 @@ model Lead {
   version              Int          @default(1)
 
   callDispositions     CallDisposition[]
-  counsellingBooking   CounsellingBooking?
+  counsellingBookings  CounsellingBooking[]
   counsellingSessions  CounsellingSession[]
   counsellingOutcomes  CounsellingOutcome[]
   convertedDonor       Donor?     @relation("LeadConvertedDonor")
@@ -1950,7 +1950,7 @@ model CallDisposition {
 
 model CounsellingBooking {
   id              String                   @id @default(cuid())
-  leadId          String                   @unique
+  leadId          String
   lead            Lead                     @relation(fields: [leadId], references: [id])
   bookedAt        DateTime                 @default(now())
   scheduledAt     DateTime
@@ -1980,6 +1980,7 @@ model CounsellingBooking {
   @@index([counsellorUserId, scheduledAt])
   @@index([status])
   @@index([bookingStatus])
+  @@index([leadId, createdAt])
 }
 
 model SlaSchedule {

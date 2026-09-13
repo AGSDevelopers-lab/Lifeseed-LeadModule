@@ -522,7 +522,7 @@ export const t19SessionCancelled: TransitionFn = (current, ctx) => {
   const extra: DomainWrite[] = full
     ? [{ kind: "counselling_booking_update", bookingStatus: "CANCELLED", legacyStatus: "CANCELLED", cancelledReason: ctx.payload.reason ?? null }]
     : [
-        { kind: "counselling_booking_update", bookingStatus: "RESCHEDULED", legacyStatus: "CANCELLED", cancelledReason: ctx.payload.reason ?? null },
+        { kind: "counselling_booking_update", bookingStatus: "RESCHEDULED", legacyStatus: "RESCHEDULED", cancelledReason: ctx.payload.reason ?? null },
         {
           kind: "counselling_booking",
           counsellorUserId: ctx.payload.counsellorUserId ?? ctx.actor.userId,

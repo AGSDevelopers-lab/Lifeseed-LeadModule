@@ -78,6 +78,7 @@ export async function bookCounsellingSession(
     permission: "counselling.book",
     payload,
     facts: { counsellorAvailable: true, personTypeRecipient: true },
+    forcePersist: true,
   });
 }
 
@@ -94,6 +95,7 @@ export async function recordCounsellingSession(
     permission: "counselling.session.record",
     payload,
     facts: { bookingExists: true, sessionRecordAttached: true },
+    forcePersist: true,
   });
 }
 

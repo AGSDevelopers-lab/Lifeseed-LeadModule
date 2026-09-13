@@ -9,6 +9,7 @@ export type LeadAccessSnapshot = {
   leadId: string;
   assignedTelecallerId: string | null;
   counsellorUserId: string | null;
+  counsellorUserIds?: string[];
   /** Resolved site for scoping (Lead.siteId is not on the v1 Prisma model; use assignee site). */
   siteId: string | null;
 };
@@ -49,6 +50,11 @@ function isCrossSiteAdmin(roles: Set<string>): boolean {
 function isSiteScopedViewer(ctx: ActorContext, roles: Set<string>): boolean {
   if (isCrossSiteAdmin(roles)) return false;
   return holdsLeadViewAny(ctx.roles);
+}
+
+function counsellorMatch(lead: LeadAccessSnapshot, userId: string): boolean {
+  if (lead.counsellorUserIds && lead.counsellorUserIds.includes(userId)) return true;
+  return Boolean(lead.counsellorUserId && lead.counsellorUserId === userId);
 }
 
 function isTelecaller(roles: Set<string>): boolean {
@@ -97,7 +103,7 @@ export function evaluateLeadAccess(
   }
 
   if (roles.has("COUNSELLOR") && !isTelecaller(roles)) {
-    if (lead.counsellorUserId && lead.counsellorUserId === ctx.userId) {
+    if (counsellorMatch(lead, ctx.userId)) {
       return { allowed: true };
     }
     return {
@@ -122,7 +128,7 @@ export function evaluateLeadAccess(
   }
 
   if (roles.has("COUNSELLOR")) {
-    if (lead.counsellorUserId && lead.counsellorUserId === ctx.userId) {
+    if (counsellorMatch(lead, ctx.userId)) {
       return { allowed: true };
     }
     return {
@@ -153,13 +159,13 @@ export function leadListScopeWhere(ctx: ActorContext): Record<string, unknown> {
     return { assignedTelecaller: { siteId: ctx.siteId } };
   }
   if (roles.has("COUNSELLOR") && !isTelecaller(roles)) {
-    return { counsellingBooking: { is: { counsellorUserId: ctx.userId } } };
+    return { counsellingBookings: { some: { counsellorUserId: ctx.userId } } };
   }
   if (isTelecaller(roles)) {
     return { assignedTelecallerId: ctx.userId };
   }
   if (roles.has("COUNSELLOR")) {
-    return { counsellingBooking: { is: { counsellorUserId: ctx.userId } } };
+    return { counsellingBookings: { some: { counsellorUserId: ctx.userId } } };
   }
   return { id: "__no_lead_scope__" };
 }

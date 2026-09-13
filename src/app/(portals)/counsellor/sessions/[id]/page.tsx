@@ -57,7 +57,7 @@ export default async function CounsellorSessionDetailPage({
       <div>
         <h1 className="text-2xl font-semibold">Session · {booking.lead.leadCode}</h1>
         <p className="text-sm text-stone-600">
-          {booking.mode} · {booking.status} ·{" "}
+          {booking.mode} · {booking.bookingStatus} / {booking.status} ·{" "}
           {booking.scheduledAt.toISOString().replace("T", " ").slice(0, 16)} UTC
         </p>
       </div>
@@ -73,7 +73,12 @@ export default async function CounsellorSessionDetailPage({
           </p>
         </CardContent>
       </Card>
-      <SessionActions bookingId={booking.id} status={booking.status} />
+      <SessionActions
+        bookingId={booking.id}
+        status={
+          booking.bookingStatus === "SCHEDULED" ? "SCHEDULED" : booking.status
+        }
+      />
     </div>
   );
 }

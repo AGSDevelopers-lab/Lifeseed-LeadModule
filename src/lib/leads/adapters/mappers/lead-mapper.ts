@@ -53,7 +53,7 @@ export type PrismaLeadRow = {
   mergedIntoLeadId: string | null;
   duplicateOfLeadId: string | null;
   version: number;
-  counsellingBooking?: { counsellorUserId: string } | null;
+  counsellingBookings?: Array<{ counsellorUserId: string }> | null;
   assignedTelecaller?: { siteId: string | null } | null;
 };
 
@@ -160,7 +160,7 @@ export function leadToPrisma(lead: Lead): PrismaLeadRow {
     mergedIntoLeadId: p.merge.mergedIntoLeadId,
     duplicateOfLeadId: p.duplicate.duplicateOfLeadId,
     version: p.version,
-    counsellingBooking: null,
+    counsellingBookings: [],
     assignedTelecaller: { siteId: p.ownership.siteId },
   };
 }

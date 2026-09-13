@@ -12,7 +12,7 @@ describe("leadListScopeWhere (P0-1)", () => {
   it("scopes COUNSELLOR to booked counsellor", () => {
     expect(
       leadListScopeWhere({ userId: "c1", roles: ["COUNSELLOR"] }),
-    ).toEqual({ counsellingBooking: { is: { counsellorUserId: "c1" } } });
+    ).toEqual({ counsellingBookings: { some: { counsellorUserId: "c1" } } });
   });
 
   it("site-scopes OPS_MANAGER", () => {
