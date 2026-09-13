@@ -1,5 +1,4 @@
 import {
-  CrmEntityType,
   LeadPersonType,
   LeadSource,
   type LeadDonorSubType,
@@ -7,7 +6,6 @@ import {
 } from "@prisma/client";
 
 import { audit } from "@/lib/audit";
-import { enqueue } from "@/lib/crm/sync-queue";
 import { prisma } from "@/lib/db";
 import {
   scheduleLeadSlaForTier,
@@ -111,10 +109,13 @@ export async function persistNewLead(input: CreateLeadInput) {
   }
 
   await scheduleLeadSlaForTier(lead.id, scored.tier, capturedAt);
-  await enqueue(CrmEntityType.LEAD, lead.id, undefined, {
-    leadCode,
-    source: input.source,
+
+  const { emitLeadScoreChanged } = await import("@/lib/leads/application/score-events");
+  await emitLeadScoreChanged({
+    leadId: lead.id,
+    score: scored.score,
     tier: scored.tier,
+    previousScore: null,
   });
 
   await audit.log({

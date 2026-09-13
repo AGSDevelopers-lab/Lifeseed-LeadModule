@@ -21,6 +21,7 @@ export async function qualifyLead(
     actor,
     permission: "lead.disposition",
     payload,
+    forcePersist: true,
   });
 }
 
@@ -47,6 +48,7 @@ export async function assignLeadToUser(
     permission: "lead.assign",
     payload: { ...payload, assigneeUserId },
     facts: { assigneeAvailable },
+    forcePersist: true,
   });
 }
 
@@ -73,6 +75,7 @@ export async function reassignLeadToUser(
     permission: "lead.reassign",
     payload: { assigneeUserId, reason },
     facts: { assigneeAvailable, reasonPresent: true },
+    forcePersist: true,
   });
 }
 
@@ -83,6 +86,7 @@ export async function claimLead(leadId: string, actor: ActorContext) {
     actor,
     permission: "lead.claim",
     facts: { claimAllowed: true },
+    forcePersist: true,
   });
 }
 
@@ -127,6 +131,7 @@ export async function archiveLeadV2(leadId: string, actor: ActorContext, reason:
     permission: "lead.archive",
     payload: { reason },
     facts: { reasonPresent: true },
+    forcePersist: true,
   });
 }
 
@@ -149,6 +154,7 @@ export async function reactivateLeadV2(leadId: string, actor: ActorContext, reas
     permission: "lead.reactivate",
     payload: { reason },
     facts: { reasonPresent: true, lostAt },
+    forcePersist: true,
   });
 }
 
@@ -175,6 +181,7 @@ export async function convertDonorStub(leadId: string, actor: ActorContext, payl
     permission: "lead.convert",
     payload,
     facts: { requiredFieldsPresent: true, hasConversion: false },
+    forcePersist: true,
   });
 }
 
@@ -186,6 +193,7 @@ export async function convertRecipientStub(leadId: string, actor: ActorContext, 
     permission: "lead.convert",
     payload,
     facts: { recommendationRegister: true, hasConversion: false },
+    forcePersist: true,
   });
 }
 

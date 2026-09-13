@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import { runPendingSync } from "@/lib/crm/sync-queue";
+import { dispatchPending } from "@/lib/leads/application/outbox-dispatcher";
+import { runCrmSyncQueue } from "@/lib/leads/application/crm-sync";
 import {
   getSession,
   permissionGranted,
@@ -12,6 +13,10 @@ import {
   hmacCronUnauthorizedJson,
 } from "@/lib/security/hmac-cron";
 
+/**
+ * Canonical CRM run: outbox dispatcher (CRM consumer → CrmSyncQueue) then CrmPort worker.
+ * Replaces System A's runPendingSync().
+ */
 export async function POST(req: NextRequest) {
   const cron = await authorizeLeadCronRequest(req);
 
@@ -37,6 +42,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const result = await runPendingSync();
-  return NextResponse.json(result);
+  const dispatch = await dispatchPending(50, {});
+  const sync = await runCrmSyncQueue();
+  return NextResponse.json({ dispatch, sync });
 }

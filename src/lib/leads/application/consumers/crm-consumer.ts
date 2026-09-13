@@ -10,6 +10,7 @@ import { CrmOperation as DomainCrmOperation } from "../../domain/enums";
 import type { LeadEventType } from "../../domain/enums";
 import type { LeadOutboxEvent } from "../../domain/entities/LeadOutboxEvent";
 import type { OutboxConsumer } from "../outbox-types";
+import { crmSyncEnqueueTargets } from "../feature-flag";
 
 export function crmOperationFor(eventType: LeadEventType): DomainCrmOperation {
   switch (eventType) {
@@ -44,34 +45,38 @@ export async function enqueueCrmSyncFromOutbox(
   db?: {
     crmSyncQueue: {
       findFirst: (args: {
-        where: { outboxEventId: string };
+        where: { outboxEventId: string; syncTarget?: CrmSyncTarget };
       }) => Promise<{ id: string } | null>;
       create: (args: { data: Prisma.CrmSyncQueueCreateInput }) => Promise<unknown>;
     };
   },
 ): Promise<void> {
   const client = db ?? (await import("@/lib/db")).prisma;
-  const existing = await client.crmSyncQueue.findFirst({
-    where: { outboxEventId: event.id },
-  });
-  if (existing) return;
+  const targets = crmSyncEnqueueTargets();
 
-  await client.crmSyncQueue.create({
-    data: {
-      entityType: CrmEntityType.LEAD,
-      entityId: event.aggregateId,
-      syncTarget: CrmSyncTarget.ZOHO,
-      payload: {
-        eventType: event.eventType,
-        eventVersion: event.eventVersion,
-        ...event.payload,
-      } as Prisma.InputJsonValue,
-      status: CrmSyncStatus.PENDING,
-      outboxEventId: event.id,
-      operation: crmOperationFor(event.eventType) as CrmOperation,
-      payloadVersion: event.eventVersion,
-    },
-  });
+  for (const target of targets) {
+    const existing = await client.crmSyncQueue.findFirst({
+      where: { outboxEventId: event.id, syncTarget: target },
+    });
+    if (existing) continue;
+
+    await client.crmSyncQueue.create({
+      data: {
+        entityType: CrmEntityType.LEAD,
+        entityId: event.aggregateId,
+        syncTarget: target,
+        payload: {
+          eventType: event.eventType,
+          eventVersion: event.eventVersion,
+          ...event.payload,
+        } as Prisma.InputJsonValue,
+        status: CrmSyncStatus.PENDING,
+        outboxEventId: event.id,
+        operation: crmOperationFor(event.eventType) as CrmOperation,
+        payloadVersion: event.eventVersion,
+      },
+    });
+  }
 }
 
 export function createCrmConsumer(enqueue: CrmEnqueueFn = enqueueCrmSyncFromOutbox): OutboxConsumer {

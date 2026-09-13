@@ -147,3 +147,47 @@ export function isLeadCounsellingHistoryEnabled(
   if (raw === "off") return false;
   return true;
 }
+
+function envFlagTrue(raw: string | undefined): boolean {
+  return raw === "true" || raw === "on";
+}
+
+/**
+ * Master CRM sync worker switch. Default OFF.
+ * Existing System A used `CRM_SYNC_ENABLED === "true"`; both `true` and `on` are accepted.
+ */
+export function isCrmSyncEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return envFlagTrue(env.CRM_SYNC_ENABLED ?? process.env.CRM_SYNC_ENABLED);
+}
+
+/** Per-provider flag. Default OFF. Worker idles for that provider when off. */
+export function isCrmZohoSyncEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return envFlagTrue(env.CRM_SYNC_ZOHO_ENABLED ?? process.env.CRM_SYNC_ZOHO_ENABLED);
+}
+
+/** Per-provider flag. Default OFF. Worker idles for that provider when off. */
+export function isCrmSalesforceSyncEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return envFlagTrue(
+    env.CRM_SYNC_SALESFORCE_ENABLED ?? process.env.CRM_SYNC_SALESFORCE_ENABLED,
+  );
+}
+
+export function isCrmProviderSyncEnabled(
+  target: "ZOHO" | "SALESFORCE",
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  if (target === "ZOHO") return isCrmZohoSyncEnabled(env);
+  return isCrmSalesforceSyncEnabled(env);
+}
+
+/** Queue enqueue targets (canonical path). Default ZOHO. */
+export function crmSyncEnqueueTargets(
+  env: NodeJS.ProcessEnv = process.env,
+): Array<"ZOHO" | "SALESFORCE"> {
+  const raw = env.CRM_SYNC_TARGETS ?? process.env.CRM_SYNC_TARGETS ?? "ZOHO";
+  const parts = raw
+    .split(",")
+    .map((s) => s.trim().toUpperCase())
+    .filter((s): s is "ZOHO" | "SALESFORCE" => s === "ZOHO" || s === "SALESFORCE");
+  return parts.length ? [...new Set(parts)] : ["ZOHO"];
+}

@@ -15,11 +15,15 @@ import { assignLead } from "../lead-assignment";
  * T-01 orchestrator. When the state-machine flag is off, delegates to the
  * existing intake writer (status defaults to NEW on the Lead row).
  */
-export async function intakeLead(input: CreateLeadInput) {
+export async function intakeLead(
+  input: CreateLeadInput,
+  options?: { forcePersist?: boolean },
+) {
   const mode = getLeadStateMachineMode();
   const created = await persistNewLead(input);
+  const forcePersist = options?.forcePersist ?? true;
 
-  if (stateMachinePersistsSideEffects(mode)) {
+  if (stateMachinePersistsSideEffects(mode) || forcePersist) {
     const actor = {
       userId: input.actorId ?? "SYSTEM",
       roles: ["SYSTEM"],

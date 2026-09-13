@@ -16,11 +16,7 @@ import { prismaTransitionStore } from "../adapters/prisma-transition-store";
 import { actorHasPerm, buildGuardFacts } from "./guard-facts";
 import { auditPort } from "./audit-adapter";
 import type { AuditPort } from "../domain/ports/AuditPort";
-import {
-  getLeadStateMachineMode,
-  isLeadConversionPortEnabled,
-  stateMachinePersistsSideEffects,
-} from "./feature-flag";
+import { isLeadConversionPortEnabled } from "./feature-flag";
 import { convertDonorStub, convertRecipientStub } from "./commands";
 import type { DonorConvertExtras, RecipientConvertInput } from "../lead-conversion";
 import type { TransitionStore } from "./__apply-transition";
@@ -247,11 +243,10 @@ export async function convertDonor(
 ): Promise<ConvertResult> {
   if (!deps.flagEnabled) {
     const { convertLeadToDonor } = await import("../lead-conversion");
-    const mode = getLeadStateMachineMode();
     const result = await convertLeadToDonor(leadId, actor.userId, extras, {
-      skipStatusWrite: stateMachinePersistsSideEffects(mode),
+      skipStatusWrite: true,
     }, actor);
-    if (result.ok && stateMachinePersistsSideEffects(mode)) {
+    if (result.ok) {
       await convertDonorStub(leadId, actor);
     }
     return result.ok ? { ok: true, donorId: result.donorId } : result;
@@ -278,11 +273,10 @@ export async function convertRecipient(
 ): Promise<ConvertResult> {
   if (!deps.flagEnabled) {
     const { convertLeadToRecipient } = await import("../lead-conversion");
-    const mode = getLeadStateMachineMode();
     const result = await convertLeadToRecipient(leadId, actor.userId, input, {
-      skipStatusWrite: stateMachinePersistsSideEffects(mode),
+      skipStatusWrite: true,
     }, actor);
-    if (result.ok && stateMachinePersistsSideEffects(mode)) {
+    if (result.ok) {
       await convertRecipientStub(leadId, actor);
     }
     return result.ok ? { ok: true, recipientId: result.recipientId } : result;

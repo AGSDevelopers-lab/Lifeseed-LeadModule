@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/primitives";
 import { prismaOutboxRepository } from "@/lib/leads/adapters/prisma-outbox";
-import { isLeadOutboxEnabled } from "@/lib/leads/application/feature-flag";
+import { isCrmSyncEnabled, isLeadOutboxEnabled } from "@/lib/leads/application/feature-flag";
+import { listCrmSyncQueue } from "@/lib/leads/application/crm-sync";
 import { renderPrometheusMetrics } from "@/lib/leads/application/consumers/analytics-consumer";
 import {
   getSession,
@@ -30,6 +31,8 @@ export default async function AdminLeadCrmMonitorPage() {
 
   const stats = await prismaOutboxRepository.stats();
   const dispatcherOn = isLeadOutboxEnabled();
+  const crmOn = isCrmSyncEnabled();
+  const queue = await listCrmSyncQueue({ take: 40 });
 
   return (
     <div className="space-y-6">
@@ -37,9 +40,11 @@ export default async function AdminLeadCrmMonitorPage() {
         <div>
           <h1 className="text-2xl font-semibold">CRM sync monitor</h1>
           <p className="text-sm text-stone-600">
-            Outbox lag and DLQ visibility (B06). Real CRM adapters ship in B16.
+            Canonical path: outbox → CRM consumer → CrmSyncQueue → CrmPort.
             Dispatcher is {dispatcherOn ? "on" : "off"} (
             <code>LEAD_OUTBOX_ENABLED</code>
+            ). Sync worker is {crmOn ? "on" : "idle"} (
+            <code>CRM_SYNC_ENABLED</code>
             ).
           </p>
         </div>
@@ -94,6 +99,48 @@ export default async function AdminLeadCrmMonitorPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm text-stone-500">CrmSyncQueue (latest)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b text-stone-500">
+                  <th className="py-2 pr-3">Job</th>
+                  <th className="py-2 pr-3">Lead</th>
+                  <th className="py-2 pr-3">Target</th>
+                  <th className="py-2 pr-3">Status</th>
+                  <th className="py-2 pr-3">External id</th>
+                  <th className="py-2 pr-3">Attempts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {queue.length === 0 ? (
+                  <tr>
+                    <td className="py-3 text-stone-500" colSpan={6}>
+                      No CRM sync jobs
+                    </td>
+                  </tr>
+                ) : (
+                  queue.map((row) => (
+                    <tr key={row.id} className="border-b border-stone-100">
+                      <td className="py-2 pr-3 font-mono text-xs">{row.id.slice(0, 10)}</td>
+                      <td className="py-2 pr-3 font-mono text-xs">{row.entityId.slice(0, 10)}</td>
+                      <td className="py-2 pr-3">{row.syncTarget}</td>
+                      <td className="py-2 pr-3">{row.status}</td>
+                      <td className="py-2 pr-3 font-mono text-xs">{row.externalId ?? "—"}</td>
+                      <td className="py-2 pr-3">{row.attempts}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

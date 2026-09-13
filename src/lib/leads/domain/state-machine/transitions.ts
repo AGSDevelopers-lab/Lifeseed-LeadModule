@@ -435,7 +435,7 @@ export const t15BookCounselling: TransitionFn = (current, ctx) => {
 
 export const t16ConvertDonor: TransitionFn = (current, ctx) => {
   const lead = requireLead(current, LeadEvent.convert_donor);
-  assertFrom(lead, [LeadStatus.CONTACTED_QUALIFIED], LeadEvent.convert_donor);
+  assertFrom(lead, [LeadStatus.CONTACTED_QUALIFIED, LeadStatus.COUNSELLING_ATTENDED], LeadEvent.convert_donor);
   const guards = evaluateGuards(
     [
       "permissionCheck",
@@ -611,7 +611,7 @@ export const t21NoShowMarkLost = markLost({
 
 export const t22ConvertRecipient: TransitionFn = (current, ctx) => {
   const lead = requireLead(current, LeadEvent.convert_recipient);
-  assertFrom(lead, [LeadStatus.COUNSELLING_ATTENDED], LeadEvent.convert_recipient);
+  assertFrom(lead, [LeadStatus.CONTACTED_QUALIFIED, LeadStatus.COUNSELLING_ATTENDED], LeadEvent.convert_recipient);
   const guards = evaluateGuards(
     [
       "permissionCheck",
