@@ -103,6 +103,14 @@ export function isLeadAssignmentV2Enabled(env: NodeJS.ProcessEnv = process.env):
   return (env.LEAD_ASSIGNMENT_V2_ENABLED ?? process.env.LEAD_ASSIGNMENT_V2_ENABLED) === "on";
 }
 
+/**
+ * B14 DuplicateCase detection + review merge. Default OFF.
+ * Never activate for production without Founder cutover.
+ */
+export function isLeadDuplicateEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return (env.LEAD_DUPLICATE_ENABLED ?? process.env.LEAD_DUPLICATE_ENABLED) === "on";
+}
+
 export type LeadFollowUpMode = "off" | "on";
 
 /**
