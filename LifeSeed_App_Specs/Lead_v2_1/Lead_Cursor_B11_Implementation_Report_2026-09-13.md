@@ -14,7 +14,7 @@
 | Starting HEAD (authorization / implementation start) | `96fe3a72efc8ce0ea2f9bc0b325e751c40d7d627` |
 | B11 implementation commit | `3e13d3813e96790465941525cf7afd68519969e8` |
 | Commit message | `feat(lead-v2.1): B11 counselling triad with multi-booking history` |
-| Ending HEAD after evidence-closure commit | recorded at git after this file is committed (same branch; includes concurrency test + this report) |
+| Ending HEAD (this evidence-closure commit) | `a17f3088e3b45fdb8256278a22721f2be5abb860` |
 | Push | **not performed** |
 | Ancestry (newest first) | `3e13d38` B11 · `96fe3a7` drop SUPER_ADMIN alias · `0c05713` P0-2 RBAC · `f34d244` SR_TELECALLER · `acea623` 05 LADR-24/25 · `8694158` T-21/T-30 · `96a686c` P0-1 · `6b3e0b8` BATCH 0 baseline · `6e1bc56` P0-1 list · `2d2b431` Phase-0 PARTIAL docs · `0ebbe5d` B10 |
 
