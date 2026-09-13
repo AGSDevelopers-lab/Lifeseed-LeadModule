@@ -40,6 +40,13 @@ export class LeadMergeAlreadyExistsError extends LeadDomainError {
   }
 }
 
+export class LeadConvertedMergeLoserError extends LeadDomainError {
+  constructor(message: string, context: LeadErrorContext = {}) {
+    super("LEAD_CONVERTED_MERGE_LOSER", message, context);
+    this.name = "LeadConvertedMergeLoserError";
+  }
+}
+
 export class LeadReactivationWindowExpiredError extends LeadDomainError {
   constructor(message: string, context: LeadErrorContext = {}) {
     super("LEAD_REACTIVATION_WINDOW_EXPIRED", message, context);

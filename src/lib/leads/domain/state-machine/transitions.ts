@@ -830,7 +830,11 @@ export const t30Expire: TransitionFn = (current, ctx) => {
 export const t31MergeLoser: TransitionFn = (current, ctx) => {
   const lead = requireLead(current, LeadEvent.merge_loser);
   assertNonTerminal(lead, LeadEvent.merge_loser);
-  const guards = evaluateGuards(["permissionCheck", "leadMergeExists"], lead, ctx);
+  const guards = evaluateGuards(
+    ["permissionCheck", "leadMergeExists", "notConvertedLoser"],
+    lead,
+    ctx,
+  );
   const to = LeadStatus.LOST;
   const winner = ctx.payload.winnerLeadId ?? "";
   return pack({

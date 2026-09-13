@@ -195,12 +195,16 @@ export async function mergeLoserStub(
   winnerLeadId: string,
   reason: string,
 ) {
+  const { prisma } = await import("@/lib/db");
+  const row = await prisma.leadMerge.findUnique({ where: { loserLeadId: leadId } });
+  const leadMergeExists = Boolean(row);
   return applyLeadEvent({
     leadId,
     event: LeadEvent.merge_loser,
     actor,
     permission: "lead.merge",
     payload: { winnerLeadId, reason },
-    facts: { leadMergeExists: true, reasonPresent: true },
+    facts: { leadMergeExists, reasonPresent: true },
+    forcePersist: true,
   });
 }

@@ -1,4 +1,5 @@
 import {
+  LeadConvertedMergeLoserError,
   LeadDncBlockedError,
   LeadDuplicateConversionError,
   LeadGuardFailedError,
@@ -31,6 +32,7 @@ export type GuardName =
   | "personTypeRecipient"
   | "recommendationRegister"
   | "leadMergeExists"
+  | "notConvertedLoser"
   | "retentionExpired"
   | "assigneeAvailable"
   | "claimAllowed"
@@ -211,6 +213,19 @@ const GUARD_RUNNERS: Record<
   },
   leadMergeExists: (_lead, ctx) => {
     if (!ctx.facts.leadMergeExists) fail("leadMergeExists", "LeadMerge row required");
+    return true;
+  },
+  notConvertedLoser: (lead) => {
+    if (lead?.props.conversion.convertedDonorId || lead?.props.conversion.convertedRecipientId) {
+      throw new LeadConvertedMergeLoserError(
+        "Converted leads cannot be merged as losers",
+        {
+          guardName: "notConvertedLoser",
+          convertedDonorId: lead.props.conversion.convertedDonorId,
+          convertedRecipientId: lead.props.conversion.convertedRecipientId,
+        },
+      );
+    }
     return true;
   },
   retentionExpired: (_lead, ctx) => {

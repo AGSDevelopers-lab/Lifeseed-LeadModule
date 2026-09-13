@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { aLead } from "../../testing/fixtures/aLead";
+import { Lead } from "../entities/Lead";
 import { LeadEvent, LeadPersonType, LeadStatus } from "../enums";
 import {
+  LeadConvertedMergeLoserError,
   LeadDncBlockedError,
   LeadDuplicateConversionError,
   LeadGuardFailedError,
@@ -10,7 +12,7 @@ import {
   LeadReactivationWindowExpiredError,
   LeadStateTransitionNotAllowedError,
 } from "../errors";
-import { TRANSITION_FNS, t01Intake, t29Reactivate, transition } from "./transitions";
+import { TRANSITION_FNS, t01Intake, t29Reactivate, t31MergeLoser, transition } from "./transitions";
 import type { GuardFacts, TransitionContext } from "./types";
 import { REACTIVATION_WINDOW_DAYS } from "./types";
 
@@ -209,6 +211,19 @@ describe("denied paths", () => {
     expect(() =>
       transition(aLead({ status: LeadStatus.LOST }), LeadEvent.assign, ctx()),
     ).toThrow(LeadStateTransitionNotAllowedError);
+  });
+
+  it("T-31 rejects a converted loser using conversion fields on the Lead", () => {
+    const base = aLead({ status: LeadStatus.ASSIGNED });
+    const converted = new Lead({
+      ...base.props,
+      conversion: {
+        convertedDonorId: "donor_1",
+        convertedRecipientId: null,
+        convertedAt: new Date("2026-09-01T00:00:00.000Z"),
+      },
+    });
+    expect(() => t31MergeLoser(converted, ctx())).toThrow(LeadConvertedMergeLoserError);
   });
 });
 
