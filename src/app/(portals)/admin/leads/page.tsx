@@ -88,6 +88,12 @@ export default async function AdminLeadsPage({
           <Link href="/admin/leads/config" className="text-emerald-900 hover:underline">
             Config
           </Link>
+          <Link href="/admin/leads/notifications/templates" className="text-emerald-900 hover:underline">
+            Templates
+          </Link>
+          <Link href="/admin/leads/notifications/delivery-log" className="text-emerald-900 hover:underline">
+            Delivery log
+          </Link>
           {canExport && (
             <a
               href="/api/leads/export"

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { getLeadStateMachineMode, getLeadNotificationPortMode, isLeadConversionPortEnabled, isLeadFollowUpEnabled, isLeadOutboxEnabled } from "./feature-flag";
+import { getLeadStateMachineMode, getLeadNotificationPortMode, isLeadConversionPortEnabled, isLeadFollowUpEnabled, isLeadOutboxEnabled, isLeadSmsEnabled, isLeadEmailEnabled, isLeadWhatsappEnabled } from "./feature-flag";
 import { getLeadConfigMode } from "../config/flag";
 
 const env = { ...process.env };
@@ -75,5 +75,16 @@ describe("LEAD_CONFIG_ENABLED", () => {
   it("defaults to partial outside production", () => {
     delete process.env.LEAD_CONFIG_ENABLED;
     expect(getLeadConfigMode({ NODE_ENV: "development" })).toBe("partial");
+  });
+});
+
+describe("B12 channel flags", () => {
+  it("default off", () => {
+    delete process.env.LEAD_SMS_ENABLED;
+    delete process.env.LEAD_EMAIL_ENABLED;
+    delete process.env.LEAD_WHATSAPP_ENABLED;
+    expect(isLeadSmsEnabled({})).toBe(false);
+    expect(isLeadEmailEnabled({})).toBe(false);
+    expect(isLeadWhatsappEnabled({})).toBe(false);
   });
 });

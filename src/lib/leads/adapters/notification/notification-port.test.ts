@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { DeliveryStatus, NotificationChannel } from "../../domain/enums";
 import { DncGatedNotificationPort } from "./notification-port";
@@ -20,6 +20,10 @@ function memoryDnc() {
 }
 
 describe("DncGatedNotificationPort", () => {
+  const env = { ...process.env };
+  afterEach(() => {
+    process.env = { ...env };
+  });
   it("blocks DNC'd recipient on all 4 channels and never calls adapters", async () => {
     const dnc = memoryDnc();
     dnc.add("blocked@example.com");
@@ -82,6 +86,8 @@ describe("DncGatedNotificationPort", () => {
   });
 
   it("successful send writes dncPassed=true and provider stub id", async () => {
+    process.env.LEAD_EMAIL_ENABLED = "on";
+    process.env.LEAD_NOTIFICATION_PORT_ENABLED = "on";
     const logs: Array<{ dncPassed: boolean; providerMessageId: string | null }> = [];
     const port = new DncGatedNotificationPort({
       isBlocked: async () => false,
@@ -105,6 +111,8 @@ describe("DncGatedNotificationPort", () => {
   });
 
   it("adding a DNC entry immediately blocks the next send (no stale cache)", async () => {
+    process.env.LEAD_SMS_ENABLED = "on";
+    process.env.LEAD_NOTIFICATION_PORT_ENABLED = "on";
     const dnc = memoryDnc();
     const port = new DncGatedNotificationPort({
       isBlocked: async (input) => dnc.isBlocked(input.recipient),
@@ -129,5 +137,35 @@ describe("DncGatedNotificationPort", () => {
       data: {},
     });
     expect(second).toMatchObject({ blocked: true, reason: "DNC" });
+  });
+
+  it("does not call vendor adapter when channel flag is off", async () => {
+    process.env.LEAD_EMAIL_ENABLED = "off";
+    const adapterCalls: string[] = [];
+    const logs: Array<{ deliveryStatus: string; failureReason: string | null }> = [];
+    const port = new DncGatedNotificationPort({
+      isBlocked: async () => false,
+      writeLog: async (row) => {
+        logs.push({ deliveryStatus: row.deliveryStatus, failureReason: row.failureReason });
+        return { id: "flag-off" };
+      },
+      adapters: {
+        EMAIL: {
+          send: async () => {
+            adapterCalls.push("EMAIL");
+            return { providerMessageId: "nope" };
+          },
+        },
+      },
+      getMode: () => "on",
+    });
+    await port.send({
+      channel: NotificationChannel.EMAIL,
+      templateKey: "t",
+      recipient: "a@b.c",
+      data: {},
+    });
+    expect(adapterCalls).toEqual([]);
+    expect(logs[0]).toEqual({ deliveryStatus: DeliveryStatus.FAILED, failureReason: "CHANNEL_DISABLED" });
   });
 });

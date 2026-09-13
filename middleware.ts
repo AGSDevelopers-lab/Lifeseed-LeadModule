@@ -12,6 +12,7 @@ const PUBLIC_PREFIXES = [
   "/api/seedscore/recalc-scheduled",
   "/api/leads/intake/web",
   "/api/leads/intake/whatsapp",
+  "/api/leads/v2/notifications/webhook",
   "/api/leads/sla/run",
   "/api/leads/crm-sync/run",
   "/api/leads/purge-expired",

@@ -17,6 +17,7 @@ import {
 } from "../../application/dnc";
 import {
   getLeadNotificationPortMode,
+  mayDispatchVendorAdapter,
   type LeadNotificationPortMode,
 } from "../../application/feature-flag";
 import type { NotificationChannelAdapter } from "./types";
@@ -79,8 +80,16 @@ function allowOverride(input: NotificationSendInput): boolean {
   return input.respectDnc === false && Boolean(input.dncOverrideReason?.trim());
 }
 
-function adapterEnabled(mode: LeadNotificationPortMode): boolean {
-  return mode !== "off";
+function adapterEnabled(
+  channel: NotificationSendInput["channel"],
+  mode: LeadNotificationPortMode,
+): boolean {
+  return mayDispatchVendorAdapter(channel, {
+    LEAD_NOTIFICATION_PORT_ENABLED: mode,
+    LEAD_SMS_ENABLED: process.env.LEAD_SMS_ENABLED,
+    LEAD_EMAIL_ENABLED: process.env.LEAD_EMAIL_ENABLED,
+    LEAD_WHATSAPP_ENABLED: process.env.LEAD_WHATSAPP_ENABLED,
+  } as NodeJS.ProcessEnv);
 }
 
 export class DncGatedNotificationPort implements NotificationPort {
@@ -117,13 +126,23 @@ export class DncGatedNotificationPort implements NotificationPort {
 
     const mode = this.deps.getMode?.() ?? getLeadNotificationPortMode();
     let providerMessageId: string | null = null;
-    if (adapterEnabled(mode)) {
+    let deliveryStatus: string = DeliveryStatus.SENT;
+    let failureReason: string | null = null;
+    if (adapterEnabled(input.channel, mode)) {
       const adapter = this.deps.adapters[input.channel];
       if (!adapter) {
         throw new Error(`No notification adapter registered for ${input.channel}`);
       }
-      const sent = await adapter.send(input);
-      providerMessageId = sent.providerMessageId;
+      try {
+        const sent = await adapter.send(input);
+        providerMessageId = sent.providerMessageId;
+      } catch (err) {
+        deliveryStatus = DeliveryStatus.FAILED;
+        failureReason = err instanceof Error ? err.message : "ADAPTER_FAILED";
+      }
+    } else if (input.channel !== "IN_APP" && mode === "on") {
+      deliveryStatus = DeliveryStatus.FAILED;
+      failureReason = "CHANNEL_DISABLED";
     }
 
     const log = await this.deps.writeLog({
@@ -134,8 +153,8 @@ export class DncGatedNotificationPort implements NotificationPort {
       recipient: input.recipient,
       sentAt: now,
       providerMessageId,
-      deliveryStatus: DeliveryStatus.SENT,
-      failureReason: null,
+      deliveryStatus,
+      failureReason,
       dncCheckedAt,
       dncPassed: !onList,
       payloadHash: payloadHash(input.data),

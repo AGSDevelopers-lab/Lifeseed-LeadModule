@@ -59,6 +59,41 @@ export function getLeadNotificationPortMode(env?: {
   return "in_app_only";
 }
 
+/** B12 per-channel flags. Default OFF unless the exact value `on` is set. */
+export function isLeadSmsEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return (env.LEAD_SMS_ENABLED ?? process.env.LEAD_SMS_ENABLED) === "on";
+}
+
+export function isLeadEmailEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return (env.LEAD_EMAIL_ENABLED ?? process.env.LEAD_EMAIL_ENABLED) === "on";
+}
+
+export function isLeadWhatsappEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return (env.LEAD_WHATSAPP_ENABLED ?? process.env.LEAD_WHATSAPP_ENABLED) === "on";
+}
+
+export function isLeadOutboundChannelFlagOn(
+  channel: "EMAIL" | "SMS" | "WHATSAPP" | "IN_APP",
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  if (channel === "IN_APP") return true;
+  if (channel === "SMS") return isLeadSmsEnabled(env);
+  if (channel === "EMAIL") return isLeadEmailEnabled(env);
+  return isLeadWhatsappEnabled(env);
+}
+
+/** Port mode + channel flag must both allow I/O before a vendor adapter may network. */
+export function mayDispatchVendorAdapter(
+  channel: "EMAIL" | "SMS" | "WHATSAPP" | "IN_APP",
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  const mode = getLeadNotificationPortMode(env);
+  if (mode === "off") return false;
+  if (channel === "IN_APP") return mode === "in_app_only" || mode === "on";
+  if (mode !== "on") return false;
+  return isLeadOutboundChannelFlagOn(channel, env);
+}
+
 export type LeadFollowUpMode = "off" | "on";
 
 /**
