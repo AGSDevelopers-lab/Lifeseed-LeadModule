@@ -122,6 +122,17 @@ export async function persistNewLead(input: CreateLeadInput) {
     },
   });
 
+  const { isLeadDuplicateEnabled } = await import("@/lib/leads/application/feature-flag");
+  if (isLeadDuplicateEnabled()) {
+    const { detectAndCreateDuplicateCases } = await import("@/lib/leads/application/duplicate");
+    await detectAndCreateDuplicateCases({
+      id: lead.id,
+      fullName: lead.fullName,
+      phone: lead.phone,
+      email: lead.email,
+    });
+  }
+
   return lead;
 }
 
