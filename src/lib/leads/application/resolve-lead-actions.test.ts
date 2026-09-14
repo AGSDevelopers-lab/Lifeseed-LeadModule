@@ -17,7 +17,6 @@ import { prisma } from "@/lib/db";
 import { aLead } from "../testing/fixtures/aLead";
 import { LeadPersonType, LeadStatus } from "../domain/enums";
 import { LEAD_360_ACTION_IDS, resolveLeadActions } from "./resolve-lead-actions";
-import { ARCHIVE_LEAD_PERMISSION, CONVERT_LEAD_PERMISSION } from "./commands";
 import {
   COUNSELLING_CANCEL_PERMISSION,
   COUNSELLING_RESCHEDULE_PERMISSION,
@@ -103,19 +102,35 @@ describe("resolveLeadActions closed catalogue", () => {
     );
   });
 
-  it("reuses command permission constants", async () => {
-    expect(ARCHIVE_LEAD_PERMISSION).toBe("lead.archive");
-    expect(CONVERT_LEAD_PERMISSION).toBe("lead.convert");
-    expect(COUNSELLING_RESCHEDULE_PERMISSION).toBe("counselling.reschedule");
-    expect(COUNSELLING_CANCEL_PERMISSION).toBe("counselling.cancel");
-    const actor = { userId: "u1", roles: ["OPS_MANAGER"], siteId: null };
-    expect(readFileSync(path.join(root, "src/lib/leads/application/counselling.ts"), "utf8")).toMatch(
-      /permission: "counselling.reschedule"/,
+  it("authorizes counselling actions through the canonical imported constants", async () => {
+    const counselling = readFileSync(
+      path.join(root, "src/lib/leads/application/counselling.ts"),
+      "utf8",
     );
-    expect(readFileSync(path.join(root, "src/lib/leads/application/counselling.ts"), "utf8")).toMatch(
-      /permission: "counselling.cancel"/,
+    const resolver = readFileSync(
+      path.join(root, "src/lib/leads/application/resolve-lead-actions.ts"),
+      "utf8",
     );
-    expect(await actorHasPerm(actor, ARCHIVE_LEAD_PERMISSION)).toBe(true);
-    expect(await actorHasPerm(actor, CONVERT_LEAD_PERMISSION)).toBe(true);
+    expect(counselling).toMatch(/from "\.\/counselling-permissions"/);
+    expect(counselling).toMatch(/permission: COUNSELLING_RESCHEDULE_PERMISSION/);
+    expect(counselling).toMatch(/permission: COUNSELLING_CANCEL_PERMISSION/);
+    expect(counselling).not.toMatch(/permission: "counselling\.reschedule"/);
+    expect(counselling).not.toMatch(/permission: "counselling\.cancel"/);
+    expect(resolver).toMatch(/from "\.\/counselling-permissions"/);
+    expect(resolver).toMatch(/COUNSELLING_RESCHEDULE_PERMISSION/);
+    expect(resolver).toMatch(/COUNSELLING_CANCEL_PERMISSION/);
+    expect(LEAD_360_ACTION_IDS).toEqual([
+      "ARCHIVE_LEAD",
+      "RESCHEDULE_COUNSELLING",
+      "CANCEL_COUNSELLING",
+      "CONVERT_TO_DONOR",
+      "CONVERT_TO_RECIPIENT",
+    ]);
+    const ops = { userId: "u1", roles: ["OPS_MANAGER"], siteId: null };
+    const marketing = { userId: "u2", roles: ["MARKETING_MANAGER"], siteId: null };
+    expect(await actorHasPerm(ops, COUNSELLING_RESCHEDULE_PERMISSION)).toBe(true);
+    expect(await actorHasPerm(ops, COUNSELLING_CANCEL_PERMISSION)).toBe(true);
+    expect(await actorHasPerm(marketing, COUNSELLING_RESCHEDULE_PERMISSION)).toBe(false);
+    expect(await actorHasPerm(marketing, COUNSELLING_CANCEL_PERMISSION)).toBe(false);
   });
 });

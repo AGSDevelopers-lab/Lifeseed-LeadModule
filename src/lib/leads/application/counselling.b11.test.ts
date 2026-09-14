@@ -16,6 +16,10 @@ import {
 } from "@/lib/leads/application/counselling";
 import { ROLE_PERMISSIONS, permissionGranted } from "@/lib/rbac-permissions";
 import { isLeadCounsellingHistoryEnabled } from "@/lib/leads/application/feature-flag";
+import {
+  COUNSELLING_CANCEL_PERMISSION,
+  COUNSELLING_RESCHEDULE_PERMISSION,
+} from "@/lib/leads/application/counselling-permissions";
 
 const actor = { userId: "u1", roles: ["TELECALLER"], siteId: "s1" };
 
@@ -43,7 +47,7 @@ describe("B11 counselling application", () => {
     expect(applyLeadEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         event: "session_cancelled",
-        permission: "counselling.reschedule",
+        permission: COUNSELLING_RESCHEDULE_PERMISSION,
         payload: expect.objectContaining({ cancelMode: "reschedule" }),
         forcePersist: true,
       }),
@@ -55,7 +59,7 @@ describe("B11 counselling application", () => {
     expect(applyLeadEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         event: "session_cancelled",
-        permission: "counselling.cancel",
+        permission: COUNSELLING_CANCEL_PERMISSION,
         payload: expect.objectContaining({ cancelMode: "full" }),
       }),
     );
