@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { getLeadStateMachineMode, getLeadNotificationPortMode, isLeadAssignmentV2Enabled, isLeadAttributionEnabled, isLeadConversionPortEnabled, isLeadDuplicateEnabled, isLeadFollowUpEnabled, isLeadOutboxEnabled, isLeadSmsEnabled, isLeadEmailEnabled, isLeadWhatsappEnabled } from "./feature-flag";
+import { getLeadStateMachineMode, getLeadNotificationPortMode, isLeadAssignmentV2Enabled, isLeadAttributionEnabled, isLeadConversionPortEnabled, isLeadDuplicateEnabled, isLeadFollowUpEnabled, isLeadOutboxEnabled, isLeadSmsEnabled, isLeadEmailEnabled, isLeadWhatsappEnabled, isLead360Enabled } from "./feature-flag";
 import { getLeadConfigMode } from "../config/flag";
 
 const env = { ...process.env };
@@ -99,6 +99,18 @@ describe("LEAD_ATTRIBUTION_ENABLED", () => {
     delete process.env.LEAD_ATTRIBUTION_ENABLED;
     expect(isLeadAttributionEnabled({})).toBe(false);
     expect(isLeadAttributionEnabled({ LEAD_ATTRIBUTION_ENABLED: "on" })).toBe(true);
+  });
+});
+
+describe("LEAD_360_ENABLED", () => {
+  it("defaults off everywhere unless the exact value on is set", () => {
+    delete process.env.LEAD_360_ENABLED;
+    expect(isLead360Enabled({})).toBe(false);
+    expect(isLead360Enabled({ NODE_ENV: "development" })).toBe(false);
+    expect(isLead360Enabled({ NODE_ENV: "production" })).toBe(false);
+    expect(isLead360Enabled({ LEAD_360_ENABLED: "true" })).toBe(false);
+    expect(isLead360Enabled({ LEAD_360_ENABLED: "ON" })).toBe(false);
+    expect(isLead360Enabled({ LEAD_360_ENABLED: "on" })).toBe(true);
   });
 });
 

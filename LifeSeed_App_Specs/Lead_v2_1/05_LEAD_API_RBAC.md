@@ -355,6 +355,8 @@ Denials always audit-log with `reason` and `requiredPermission`.
 | follow_up.* (own) | ✓ | ✓ | ✓ | ✓ | – | – | – | ✓ |
 | follow_up.* (any) | – | – | – | ✓ | – | – | – | ✓ |
 | counselling.book | ✓ (own leads) | ✓ | – | ✓ | – | – | – | ✓ |
+| counselling.reschedule | ✓ | ✓ | ✓ | ✓ | – | – | – | ✓ |
+| counselling.cancel | ✓ | ✓ | ✓ | ✓ | – | – | – | ✓ |
 | counselling.session.record | – | – | ✓ | ✓ (override) | – | – | – | ✓ |
 | counselling.outcome.record | – | – | ✓ | ✓ (override) | – | – | – | ✓ |
 | dnc.view | ✓ | ✓ | ✓ | ✓ | ✓ | – | – | ✓ |

@@ -123,12 +123,18 @@ export async function recordCounsellingSession(
   });
 }
 
+/** Same permission string `archiveLeadV2` passes to `applyLeadEvent`. */
+export const ARCHIVE_LEAD_PERMISSION = "lead.archive" as const;
+
+/** Same permission string convert stubs pass to `applyLeadEvent`. */
+export const CONVERT_LEAD_PERMISSION = "lead.convert" as const;
+
 export async function archiveLeadV2(leadId: string, actor: ActorContext, reason: string) {
   return applyLeadEvent({
     leadId,
     event: LeadEvent.archive,
     actor,
-    permission: "lead.archive",
+    permission: ARCHIVE_LEAD_PERMISSION,
     payload: { reason },
     facts: { reasonPresent: true },
     forcePersist: true,
@@ -178,7 +184,7 @@ export async function convertDonorStub(leadId: string, actor: ActorContext, payl
     leadId,
     event: LeadEvent.convert_donor,
     actor,
-    permission: "lead.convert",
+    permission: CONVERT_LEAD_PERMISSION,
     payload,
     facts: { requiredFieldsPresent: true, hasConversion: false },
     forcePersist: true,
@@ -190,7 +196,7 @@ export async function convertRecipientStub(leadId: string, actor: ActorContext, 
     leadId,
     event: LeadEvent.convert_recipient,
     actor,
-    permission: "lead.convert",
+    permission: CONVERT_LEAD_PERMISSION,
     payload,
     facts: { recommendationRegister: true, hasConversion: false },
     forcePersist: true,

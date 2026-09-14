@@ -172,6 +172,15 @@ export function isCrmSalesforceSyncEnabled(env: NodeJS.ProcessEnv = process.env)
   );
 }
 
+/**
+ * B17-A Lead 360 detail surface + three read routes.
+ * Default OFF everywhere (including dev/staging) unless the exact value `on` is set.
+ * Never activate in production without a separate Founder decision.
+ */
+export function isLead360Enabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return (env.LEAD_360_ENABLED ?? process.env.LEAD_360_ENABLED) === "on";
+}
+
 export function isCrmProviderSyncEnabled(
   target: "ZOHO" | "SALESFORCE",
   env: NodeJS.ProcessEnv = process.env,

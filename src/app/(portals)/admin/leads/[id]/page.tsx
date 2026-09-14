@@ -3,13 +3,16 @@ import { notFound, redirect } from "next/navigation";
 import { LeadStatus, UserRole } from "@prisma/client";
 
 import { LeadAdminActions } from "@/app/(portals)/admin/leads/[id]/lead-admin-actions";
+import { Lead360Detail } from "@/components/leads/lead360/lead360-detail";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/primitives";
+import { isLead360Enabled } from "@/lib/leads/application/feature-flag";
+import { resolveLeadActions } from "@/lib/leads/application/resolve-lead-actions";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { prisma } from "@/lib/db";
 import { resolveLeadActor } from "@/lib/leads/adapters/identity-adapter";
-import { loadAdminLeadDetail } from "@/lib/leads/adapters/prisma-lead-repository";
+import { loadAdminLeadDetail, prismaLeadRepository } from "@/lib/leads/adapters/prisma-lead-repository";
 import { LeadOwnershipDeniedError } from "@/lib/leads/domain/errors";
 import { getSession, permissionGranted, permissionsForRoles } from "@/lib/rbac";
 import { cn } from "@/lib/utils";
@@ -88,6 +91,20 @@ export default async function AdminLeadDetailPage({
   }
   if (!lead) notFound();
 
+  if (isLead360Enabled()) {
+    const domain = await prismaLeadRepository.byId(id, actor);
+    if (!domain) notFound();
+    const actions = await resolveLeadActions(domain, actor);
+    return (
+      <Lead360Detail
+        lead={lead}
+        telecallers={telecallers}
+        perms={perms}
+        actions={actions.map((a) => a.id)}
+      />
+    );
+  }
+
   const meta = asRec(lead.sourceMetadata);
   const utm = Object.fromEntries(Object.entries(meta).filter(([k]) => k.toLowerCase().startsWith("utm")));
   const other = Object.fromEntries(Object.entries(meta).filter(([k]) => !k.toLowerCase().startsWith("utm")));
@@ -108,7 +125,7 @@ export default async function AdminLeadDetailPage({
         <p className="text-stone-700">{lead.fullName ?? "—"}</p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className={cn("inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ring-1", TIER_CLASS[lead.tier] ?? TIER_CLASS.COLD)}>
-            Tier at capture · {lead.tier}
+            Current Tier · {lead.tier}
           </span>
           <span className="inline-flex rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-medium ring-1 ring-stone-200">
             {lead.status}

@@ -606,34 +606,32 @@ Each batch below = **one bounded Cursor Composer prompt**. Never combine batches
 
 ---
 
-### Batch B17 · Lead 360 + UI Polish (P2)
+### Batch B17-A · Lead 360 Core (P2)
 
-**Objective:** Kill raw JSON in admin lead detail. All 18 UI surfaces per `02_LEAD_ARCHITECTURE_MASTER.md` §7 (`01_LEAD_PRODUCT_MASTER.md` §5).
+**Objective:** Structured Lead 360 detail surface (identity, status, outcome, archive, current tier, counselling, attribution, CRM status, timeline, five permitted actions). Kill the raw-JSON fallback on that surface when `LEAD_360_ENABLED=on`.
 
 **Files/modules affected:**
-- `src/app/(portals)/admin/leads/[id]/**` — rebuild as Lead 360
-- Telecaller Workspace refresh
-- Path C fixes: Aadhaar validation `mode: "onChange"` · tier column rename to "Tier at capture" · Outcome column added
+- `src/app/(portals)/admin/leads/[id]/**` — flag-gated Lead 360 detail
+- `src/lib/leads/application/resolve-lead-actions.ts`
+- Read routes: `GET /v2/leads/{id}/timeline`, `GET /v2/leads/{id}/attribution`, `GET /v2/leads/{id}/crm-status`
 
 **Schema changes:** none
 
-**APIs:** existing v2 endpoints
+**APIs:** three new read-only routes above (Lead-detail authorization). CRM status is read from existing `CrmSyncQueue` (not stub-only).
 
-**UI changes:** all 18 surfaces present
+**UI changes:** Lead 360 detail surface only (remaining 17 surfaces + list Outcome column are B17-B)
 
-**Tests:**
-- Snapshot tests for each surface (structural)
-- Playwright E2E: intake → convert donor flow entirely UI-driven
-
-**Migration:** none
-
-**Feature flag:** `LEAD_360_ENABLED` (default off; flip after review)
-
-**Rollback:** flip flag; old admin lead detail
+**Feature flag:** `LEAD_360_ENABLED` (default off everywhere)
 
 **Acceptance criteria:**
-- Zero raw JSON visible in any operational surface
-- All Path C bugs closed
+- Zero raw JSON on the Lead 360 surface when the flag is on
+- Legacy detail remains when the flag is off
+
+---
+
+### Batch B17-B · Remaining UI surfaces (deferred)
+
+**Not in B17-A.** Remaining 17 UI surfaces, Lead list Outcome column, and Aadhaar `onChange` Path C item require a separate Design Lock.
 
 ---
 
