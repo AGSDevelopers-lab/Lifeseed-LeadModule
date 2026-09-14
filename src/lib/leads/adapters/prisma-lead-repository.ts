@@ -55,7 +55,7 @@ export type LeadReadDb = {
     findMany: (args: {
       where: Record<string, unknown>;
       include: typeof ACCESS_INCLUDE;
-      orderBy: [{ capturedAt: "desc" }, { id: "desc" }];
+      orderBy: Array<Record<string, "asc" | "desc">>;
       take: number;
     }) => Promise<LeadAccessRow[]>;
   };
@@ -63,6 +63,21 @@ export type LeadReadDb = {
 
 function toDomain(row: LeadAccessRow): Lead {
   return leadToDomain(row);
+}
+
+async function applySlaBreachedWhere(
+  where: Record<string, unknown>,
+  filters?: LeadListFilters,
+): Promise<Record<string, unknown>> {
+  if (!filters?.slaBreached) return where;
+  const rows = await prisma.slaSchedule.findMany({
+    where: { status: "BREACHED", entityType: "LEAD_RESPONSE" },
+    select: { entityId: true },
+  });
+  const ids = rows.map((r) => r.entityId);
+  const AND = Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : [];
+  where.AND = [...AND, { id: { in: ids } }];
+  return where;
 }
 
 export class PrismaLeadRepository implements LeadRepository {
@@ -109,7 +124,10 @@ export class PrismaLeadRepository implements LeadRepository {
   }
 
   async count(actor: ActorContext, filters?: LeadListFilters): Promise<number> {
-    const where = mergeLeadListFilters(leadListScopeWhere(actor), filters);
+    const where = await applySlaBreachedWhere(
+      mergeLeadListFilters(leadListScopeWhere(actor), filters),
+      filters,
+    );
     return prisma.lead.count({ where: where as Prisma.LeadWhereInput });
   }
 
@@ -123,12 +141,23 @@ export class PrismaLeadRepository implements LeadRepository {
     return rows.map((r) => ({ source: r.source, count: r._count._all }));
   }
 
+  async groupByTier(actor: ActorContext, filters?: LeadListFilters) {
+    const where = mergeLeadListFilters(leadListScopeWhere(actor), filters);
+    const rows = await prisma.lead.groupBy({
+      by: ["tier"],
+      where: where as Prisma.LeadWhereInput,
+      _count: { _all: true },
+    });
+    return rows.map((r) => ({ tier: r.tier, count: r._count._all }));
+  }
+
   async list(actor: ActorContext, filters?: LeadListFilters): Promise<LeadListPage> {
     const ceiling = filters?.purpose === "export" ? 5000 : 200;
     const limit = Math.min(Math.max(filters?.limit ?? 50, 1), ceiling);
     const scope = leadListScopeWhere(actor);
-    const where = mergeLeadListFilters(scope, filters);
-    const cursor = filters?.cursor ? decodeLeadCursor(filters.cursor) : null;
+    const where = await applySlaBreachedWhere(mergeLeadListFilters(scope, filters), filters);
+    const slaSort = filters?.orderBy === "slaResponseDueAt";
+    const cursor = !slaSort && filters?.cursor ? decodeLeadCursor(filters.cursor) : null;
     if (cursor) {
       const AND = Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : [];
       where.AND = [
@@ -144,7 +173,9 @@ export class PrismaLeadRepository implements LeadRepository {
     const rows = await this.db.lead.findMany({
       where,
       include: ACCESS_INCLUDE,
-      orderBy: [{ capturedAt: "desc" }, { id: "desc" }],
+      orderBy: slaSort
+        ? [{ slaResponseDueAt: "asc" }, { id: "asc" }]
+        : [{ capturedAt: "desc" }, { id: "desc" }],
       take: limit + 1,
     });
     const page = rows.slice(0, limit);
@@ -202,6 +233,35 @@ export async function countScopedLeads(
   extra: LeadListFilters = {},
 ): Promise<number> {
   return prismaLeadRepository.count(actor, extra);
+}
+
+export async function listAtRiskLeads(
+  actor: ActorContext,
+  dueBefore: Date,
+  take = 200,
+) {
+  const where = mergeLeadListFilters(leadListScopeWhere(actor), {
+    slaResponseDueBefore: dueBefore,
+    statusNotIn: [
+      LeadStatus.CONVERTED,
+      LeadStatus.LOST,
+      LeadStatus.EXPIRED_AUTO_PURGED,
+      LeadStatus.DO_NOT_CALL,
+    ],
+  }) as Prisma.LeadWhereInput;
+  return prisma.lead.findMany({
+    where,
+    orderBy: [{ slaResponseDueAt: "asc" }, { id: "asc" }],
+    take,
+    select: {
+      id: true,
+      leadCode: true,
+      fullName: true,
+      status: true,
+      slaResponseDueAt: true,
+      tier: true,
+    },
+  });
 }
 
 /** Assignment queue depth — per-assignee, not a cross-actor list (BATCH 1). */

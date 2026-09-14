@@ -140,6 +140,19 @@ describe("PrismaLeadRepository.byId IDOR", () => {
     expect(arg.where.assignedTelecallerId).toBe("tele-a");
   });
 
+  it("list SLA urgency sort orders by slaResponseDueAt", async () => {
+    const audit = fakeAudit();
+    const { repo, findMany } = makeRepo(prismaRow(), audit);
+    await repo.list(
+      { userId: "ops", roles: ["OPS_MANAGER"], siteId: "site-kol" },
+      { orderBy: "slaResponseDueAt" },
+    );
+    const arg = findMany.mock.calls[0][0] as {
+      orderBy: Array<Record<string, string>>;
+    };
+    expect(arg.orderBy[0]).toEqual({ slaResponseDueAt: "asc" });
+  });
+
   it("refuses BANK_MEDICAL_DIRECTOR case-level read (LADR-25)", async () => {
     const audit = fakeAudit();
     const { repo } = makeRepo(prismaRow(), audit);

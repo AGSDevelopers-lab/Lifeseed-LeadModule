@@ -3,6 +3,7 @@ import { LeadStatus, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import type { ActorContext } from "../domain/ports/shared";
 import type { LeadListFilters } from "../domain/ports/LeadRepository";
+import { computeMonthlyConversionCohorts } from "../application/lead-cohort";
 import { leadListScopeWhere, mergeLeadListFilters } from "./lead-access-scope";
 import { prismaLeadRepository } from "./prisma-lead-repository";
 
@@ -54,6 +55,19 @@ export async function countLeadsWhere(
 export async function groupLeadsBySource(actor: ActorContext, filters?: LeadListFilters) {
   const rows = await prismaLeadRepository.groupBySource(actor, filters);
   return rows.map((r) => ({ source: r.source, _count: { _all: r.count } }));
+}
+
+export async function groupLeadsByTier(actor: ActorContext, filters?: LeadListFilters) {
+  const rows = await prismaLeadRepository.groupByTier(actor, filters);
+  return rows.map((r) => ({ tier: r.tier, _count: { _all: r.count } }));
+}
+
+export async function groupLeadsByEntryCohort(actor: ActorContext, now = new Date()) {
+  const rows = await prisma.lead.findMany({
+    where: scopedWhere(actor),
+    select: { createdAt: true, convertedAt: true, status: true, outcome: true },
+  });
+  return computeMonthlyConversionCohorts(rows, now);
 }
 
 export async function listExpiredLeadIds(

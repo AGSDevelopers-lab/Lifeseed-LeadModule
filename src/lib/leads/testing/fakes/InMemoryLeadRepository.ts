@@ -66,6 +66,16 @@ export class InMemoryLeadRepository implements LeadRepository {
     return [...map.entries()].map(([source, count]) => ({ source, count }));
   }
 
+  async groupByTier(actor: ActorContext, filters?: LeadListFilters) {
+    const page = await this.list(actor, { ...filters, limit: 10_000 });
+    const map = new Map<string, number>();
+    for (const lead of page.items) {
+      const t = String(lead.props.latestScore?.tier ?? "COLD");
+      map.set(t, (map.get(t) ?? 0) + 1);
+    }
+    return [...map.entries()].map(([tier, count]) => ({ tier, count }));
+  }
+
   private filterItems(items: Lead[], filters?: LeadListFilters): Lead[] {
     if (!filters) return items;
     return items.filter((l) => {

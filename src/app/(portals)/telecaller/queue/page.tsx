@@ -17,6 +17,7 @@ import {
   permissionsForRoles,
 } from "@/lib/rbac";
 import { cn } from "@/lib/utils";
+import { QueueDispositionControl } from "./queue-disposition-control";
 
 export default async function TelecallerQueuePage({
   searchParams,
@@ -57,12 +58,13 @@ export default async function TelecallerQueuePage({
               <TableHead>Tier</TableHead>
               <TableHead>SLA</TableHead>
               <TableHead>Last activity</TableHead>
+              <TableHead>Disposition</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-stone-500">
+                <TableCell colSpan={7} className="text-center text-stone-500">
                   Queue empty
                 </TableCell>
               </TableRow>
@@ -106,6 +108,9 @@ export default async function TelecallerQueuePage({
                   </TableCell>
                   <TableCell className="text-xs">
                     {r.lastActivityAt.toISOString().slice(0, 10)}
+                  </TableCell>
+                  <TableCell>
+                    <QueueDispositionControl leadId={r.id} />
                   </TableCell>
                 </TableRow>
               );

@@ -23,6 +23,10 @@ export type LeadListFilters = {
   limit?: number;
   purpose?: LeadListPurpose;
   slaResponseDueBefore?: Date;
+  /** Leads with an SlaSchedule row status=BREACHED, entityType=LEAD_RESPONSE. */
+  slaBreached?: boolean;
+  /** Default capturedAt desc; slaResponseDueAt mirrors telecaller queue urgency. */
+  orderBy?: "capturedAt" | "slaResponseDueAt";
   convertedAtFrom?: Date;
   convertedByUserId?: string;
   retentionExpiresAtTo?: Date;
@@ -30,6 +34,11 @@ export type LeadListFilters = {
 
 export type LeadSourceCount = {
   source: string;
+  count: number;
+};
+
+export type LeadTierCount = {
+  tier: string;
   count: number;
 };
 
@@ -44,6 +53,7 @@ export interface LeadRepository {
   /** Scoped aggregate — CONFLICT-25. */
   count(actor: ActorContext, filters?: LeadListFilters): Promise<number>;
   groupBySource(actor: ActorContext, filters?: LeadListFilters): Promise<LeadSourceCount[]>;
+  groupByTier(actor: ActorContext, filters?: LeadListFilters): Promise<LeadTierCount[]>;
   create(lead: Lead): Promise<Lead>;
   update(lead: Lead): Promise<Lead>;
 }

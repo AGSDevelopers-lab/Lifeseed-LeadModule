@@ -25,6 +25,8 @@ import {
   permissionsForRoles,
 } from "@/lib/rbac";
 
+const AT_RISK_MS = 2 * 60 * 60 * 1000;
+
 export default async function AdminLeadsPage({
   searchParams,
 }: {
@@ -33,6 +35,8 @@ export default async function AdminLeadsPage({
     status?: string;
     source?: string;
     personType?: string;
+    sort?: string;
+    sla?: string;
   }>;
 }) {
   const session = await getSession();
@@ -44,12 +48,27 @@ export default async function AdminLeadsPage({
   const actor = await resolveLeadActor();
   if (!actor) redirect("/login");
 
+  const slaUrgency = sp.sort === "sla";
+  const slaAtRisk = sp.sla === "at-risk";
+  const slaBreached = sp.sla === "breached";
+
   const page = await prismaLeadRepository.list(actor, {
     tier: sp.tier,
     status: sp.status,
     source: sp.source,
     personType: sp.personType,
     limit: 200,
+    orderBy: slaUrgency ? "slaResponseDueAt" : "capturedAt",
+    slaResponseDueBefore: slaAtRisk ? new Date(Date.now() + AT_RISK_MS) : undefined,
+    slaBreached: slaBreached || undefined,
+    statusNotIn: slaAtRisk
+      ? [
+          LeadStatus.CONVERTED,
+          LeadStatus.LOST,
+          LeadStatus.EXPIRED_AUTO_PURGED,
+          LeadStatus.DO_NOT_CALL,
+        ]
+      : undefined,
   });
   const rows = page.items;
 
@@ -65,6 +84,24 @@ export default async function AdminLeadsPage({
     "lead.export",
   );
 
+  const qs = (next: Record<string, string | undefined>) => {
+    const p = new URLSearchParams();
+    const merged = {
+      tier: sp.tier,
+      status: sp.status,
+      source: sp.source,
+      personType: sp.personType,
+      sort: sp.sort,
+      sla: sp.sla,
+      ...next,
+    };
+    for (const [k, v] of Object.entries(merged)) {
+      if (v) p.set(k, v);
+    }
+    const s = p.toString();
+    return s ? `?${s}` : "";
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -75,9 +112,18 @@ export default async function AdminLeadsPage({
             counselled → {converted} converted
           </p>
         </div>
-        <div className="flex gap-3 text-sm">
+        <div className="flex flex-wrap gap-3 text-sm">
           <Link href="/admin/leads/analytics" className="text-emerald-900 hover:underline">
             Analytics
+          </Link>
+          <Link href="/admin/leads/command-centre" className="text-emerald-900 hover:underline">
+            Command centre
+          </Link>
+          <Link href="/admin/leads/sla-monitor" className="text-emerald-900 hover:underline">
+            SLA monitor
+          </Link>
+          <Link href="/admin/leads/audit" className="text-emerald-900 hover:underline">
+            Audit
           </Link>
           <Link href="/admin/leads/campaigns" className="text-emerald-900 hover:underline">
             Campaigns
@@ -111,6 +157,28 @@ export default async function AdminLeadsPage({
         </div>
       </div>
 
+      <div className="flex flex-wrap gap-3 text-sm">
+        <span className="text-stone-500">SLA:</span>
+        <Link
+          href={`/admin/leads${qs({ sort: slaUrgency ? undefined : "sla" })}`}
+          className={slaUrgency ? "font-medium text-emerald-900" : "text-emerald-900 hover:underline"}
+        >
+          {slaUrgency ? "Urgency sort on" : "Sort by SLA urgency"}
+        </Link>
+        <Link
+          href={`/admin/leads${qs({ sla: slaAtRisk ? undefined : "at-risk" })}`}
+          className={slaAtRisk ? "font-medium text-amber-800" : "text-emerald-900 hover:underline"}
+        >
+          At-risk (≤2h)
+        </Link>
+        <Link
+          href={`/admin/leads${qs({ sla: slaBreached ? undefined : "breached" })}`}
+          className={slaBreached ? "font-medium text-red-800" : "text-emerald-900 hover:underline"}
+        >
+          Breached
+        </Link>
+      </div>
+
       <div className="rounded-xl border border-stone-200 bg-white">
         <Table>
           <TableHeader>
@@ -121,6 +189,7 @@ export default async function AdminLeadsPage({
               <TableHead>Source</TableHead>
               <TableHead>Tier</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Outcome</TableHead>
               <TableHead>Telecaller</TableHead>
             </TableRow>
           </TableHeader>
@@ -140,6 +209,7 @@ export default async function AdminLeadsPage({
                 <TableCell className="text-xs">{r.props.source}</TableCell>
                 <TableCell>{r.props.latestScore?.tier ?? "—"}</TableCell>
                 <TableCell className="text-xs">{r.status}</TableCell>
+                <TableCell className="text-xs">{r.props.outcome ?? "—"}</TableCell>
                 <TableCell className="text-xs">
                   {r.props.ownership.assignedTelecallerId ?? "—"}
                 </TableCell>

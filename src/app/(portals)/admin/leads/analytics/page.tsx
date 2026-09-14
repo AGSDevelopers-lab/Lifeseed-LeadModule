@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { countLeadsWhere, groupLeadsBySource } from "@/lib/leads/adapters/prisma-lead-analytics";
+import { countLeadsWhere, groupLeadsBySource, groupLeadsByTier, groupLeadsByEntryCohort } from "@/lib/leads/adapters/prisma-lead-analytics";
 import { resolveLeadActor } from "@/lib/leads/adapters/identity-adapter";
 import { computeCampaignCac } from "@/lib/leads/application/attribution";
 import { prisma } from "@/lib/db";
@@ -40,8 +40,16 @@ export default async function AdminLeadsAnalyticsPage() {
   const convertedBySource = await groupLeadsBySource(actor, {
     status: LeadStatus.CONVERTED,
   });
+  const byTier = await groupLeadsByTier(actor);
+  const convertedByTier = await groupLeadsByTier(actor, {
+    status: LeadStatus.CONVERTED,
+  });
+  const cohorts = await groupLeadsByEntryCohort(actor);
   const convMap = new Map(
     convertedBySource.map((r) => [r.source, r._count._all]),
+  );
+  const convTierMap = new Map(
+    convertedByTier.map((r) => [r.tier, r._count._all]),
   );
 
   const telecallers = await prisma.user.findMany({
@@ -169,6 +177,84 @@ export default async function AdminLeadsAnalyticsPage() {
                   </TableRow>
                 );
               })}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="mb-2 font-semibold">Conversion by tier</h2>
+        <div className="rounded-xl border border-stone-200 bg-white">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Tier</TableHead>
+                <TableHead>Leads</TableHead>
+                <TableHead>Converted</TableHead>
+                <TableHead>Rate</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {byTier.map((r) => {
+                const conv = convTierMap.get(r.tier) ?? 0;
+                const rate =
+                  r._count._all === 0
+                    ? 0
+                    : Math.round((conv / r._count._all) * 100);
+                return (
+                  <TableRow key={r.tier}>
+                    <TableCell>{r.tier}</TableCell>
+                    <TableCell>{r._count._all}</TableCell>
+                    <TableCell>{conv}</TableCell>
+                    <TableCell>{rate}%</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="mb-2 font-semibold">Cohort analysis</h2>
+        <p className="mb-2 text-xs text-stone-500">
+          Monthly entry cohort by createdAt. Conversion windows 30/60/90 days from entry.
+          Windows not yet elapsed show in progress, not 0%.
+        </p>
+        <div className="rounded-xl border border-stone-200 bg-white">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Cohort month</TableHead>
+                <TableHead>Size</TableHead>
+                <TableHead>30-day</TableHead>
+                <TableHead>60-day</TableHead>
+                <TableHead>90-day</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {cohorts.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-stone-500">
+                    No cohorts
+                  </TableCell>
+                </TableRow>
+              )}
+              {cohorts.map((c) => (
+                <TableRow key={c.month}>
+                  <TableCell>{c.month}</TableCell>
+                  <TableCell>{c.cohortSize}</TableCell>
+                  <TableCell>
+                    {c.d30.status === "in_progress" ? "in progress" : `${c.d30.ratePct}%`}
+                  </TableCell>
+                  <TableCell>
+                    {c.d60.status === "in_progress" ? "in progress" : `${c.d60.ratePct}%`}
+                  </TableCell>
+                  <TableCell>
+                    {c.d90.status === "in_progress" ? "in progress" : `${c.d90.ratePct}%`}
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </div>
