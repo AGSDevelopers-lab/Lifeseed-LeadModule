@@ -120,7 +120,7 @@ export default async function AdminLeadDetailPage({
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/admin/leads" className="text-sm text-emerald-900 hover:underline">← Leads</Link>
+        <Link href="/admin/leads" className="text-sm text-brand-800 hover:underline">← Leads</Link>
         <h1 className="mt-2 text-2xl font-semibold">{lead.leadCode}</h1>
         <p className="text-stone-700">{lead.fullName ?? "—"}</p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -133,7 +133,7 @@ export default async function AdminLeadDetailPage({
           <span className="text-sm font-medium">Score {lead.score}</span>
         </div>
         <p className="mt-2 text-xs">
-          <Link href={`/telecaller/leads/${lead.id}`} className="text-emerald-900 hover:underline">
+          <Link href={`/telecaller/leads/${lead.id}`} className="text-brand-800 hover:underline">
             Open telecaller view
           </Link>
         </p>
@@ -216,7 +216,7 @@ export default async function AdminLeadDetailPage({
           <p>
             Telecaller:{" "}
             {lead.assignedTelecaller ? (
-              <Link href="/telecaller/queue" className="text-emerald-900 hover:underline">
+              <Link href="/telecaller/queue" className="text-brand-800 hover:underline">
                 {lead.assignedTelecaller.email}
               </Link>
             ) : "unassigned"}

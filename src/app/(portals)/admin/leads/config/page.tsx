@@ -37,7 +37,7 @@ export default async function LeadConfigIndexPage() {
               <div>
                 <Link
                   href={`/admin/leads/config/${key}`}
-                  className="font-medium text-emerald-900 hover:underline"
+                  className="font-medium text-brand-800 hover:underline"
                 >
                   {CONFIG_LABELS[key]}
                 </Link>
@@ -48,7 +48,7 @@ export default async function LeadConfigIndexPage() {
               </div>
               <Link
                 href={`/admin/leads/config/${key}`}
-                className="text-sm text-emerald-900 hover:underline"
+                className="text-sm text-brand-800 hover:underline"
               >
                 Open
               </Link>

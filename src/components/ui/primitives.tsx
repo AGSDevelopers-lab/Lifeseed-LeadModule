@@ -17,7 +17,7 @@ export function Button({
         "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors",
         "h-10 px-4 py-2 disabled:pointer-events-none disabled:opacity-50",
         variant === "default" &&
-          "bg-emerald-800 text-white hover:bg-emerald-900",
+          "bg-brand-500 text-white hover:bg-brand-600",
         variant === "outline" &&
           "border border-stone-300 bg-white hover:bg-stone-50 text-stone-900",
         variant === "ghost" && "hover:bg-stone-100 text-stone-900",
@@ -38,7 +38,7 @@ export function Input({
     <input
       className={cn(
         "flex h-10 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm",
-        "placeholder:text-stone-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700",
+        "placeholder:text-stone-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500",
         "disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
@@ -66,7 +66,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-xl border border-stone-200 bg-white text-stone-950 shadow-sm",
+        "rounded-2xl border border-stone-200 bg-surface-raised text-stone-950 shadow-[0_2px_10px_-2px_rgba(180,90,30,0.12)]",
         className,
       )}
       {...props}

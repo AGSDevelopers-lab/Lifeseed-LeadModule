@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Eye } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/primitives";
 import {
@@ -40,7 +41,8 @@ export default async function LeadSlaMonitorPage() {
         <h1 className="text-2xl font-semibold">SLA monitor</h1>
         <p className="text-sm text-stone-600">
           Refresh-on-load.{" "}
-          <Link href="/admin/leads" className="text-emerald-900 hover:underline">
+          <Link href="/admin/leads" className="inline-flex items-center gap-1 text-brand-800 hover:underline">
+            <Eye className="h-4 w-4" />
             Back to leads
           </Link>
         </p>
@@ -63,7 +65,7 @@ export default async function LeadSlaMonitorPage() {
 
       <div>
         <h2 className="mb-2 font-semibold">Current breaches</h2>
-        <div className="rounded-xl border border-stone-200 bg-white">
+        <div className="rounded-2xl border border-stone-200 bg-surface-raised shadow-[0_2px_10px_-2px_rgba(180,90,30,0.12)]">
           <Table>
             <TableHeader>
               <TableRow>
@@ -100,7 +102,7 @@ export default async function LeadSlaMonitorPage() {
 
       <div>
         <h2 className="mb-2 font-semibold">At-risk leads</h2>
-        <div className="rounded-xl border border-stone-200 bg-white">
+        <div className="rounded-2xl border border-stone-200 bg-surface-raised shadow-[0_2px_10px_-2px_rgba(180,90,30,0.12)]">
           <Table>
             <TableHeader>
               <TableRow>
@@ -122,11 +124,21 @@ export default async function LeadSlaMonitorPage() {
               {atRisk.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell>
-                    <Link href={`/admin/leads/${r.id}`} className="text-emerald-900 hover:underline">
+                    <Link
+                      href={`/admin/leads/${r.id}`}
+                      className="inline-flex max-w-[12rem] items-center gap-1 overflow-hidden text-ellipsis whitespace-nowrap text-brand-800 hover:underline"
+                      title={r.leadCode}
+                    >
+                      <Eye className="h-4 w-4 shrink-0" />
                       {r.leadCode}
                     </Link>
                   </TableCell>
-                  <TableCell>{r.fullName ?? "—"}</TableCell>
+                  <TableCell
+                    className="max-w-[12rem] overflow-hidden text-ellipsis whitespace-nowrap"
+                    title={r.fullName ?? "—"}
+                  >
+                    {r.fullName ?? "—"}
+                  </TableCell>
                   <TableCell>{r.tier}</TableCell>
                   <TableCell className="text-xs">{r.status}</TableCell>
                   <TableCell className="text-xs">
@@ -141,7 +153,7 @@ export default async function LeadSlaMonitorPage() {
 
       <div>
         <h2 className="mb-2 font-semibold">Historical breach rate (8 weeks)</h2>
-        <div className="rounded-xl border border-stone-200 bg-white">
+        <div className="rounded-2xl border border-stone-200 bg-surface-raised shadow-[0_2px_10px_-2px_rgba(180,90,30,0.12)]">
           <Table>
             <TableHeader>
               <TableRow>

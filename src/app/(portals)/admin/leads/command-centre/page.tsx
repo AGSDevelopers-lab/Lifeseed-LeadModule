@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Eye } from "lucide-react";
 import { FollowUpStatus, LeadStatus } from "@prisma/client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/primitives";
@@ -107,7 +108,8 @@ export default async function LeadCommandCentrePage() {
         <h1 className="text-2xl font-semibold">Lead command centre</h1>
         <p className="text-sm text-stone-600">
           Refresh-on-load snapshot.{" "}
-          <Link href="/admin/leads" className="text-emerald-900 hover:underline">
+          <Link href="/admin/leads" className="inline-flex items-center gap-1 text-brand-800 hover:underline">
+            <Eye className="h-4 w-4" />
             Back to leads
           </Link>
         </p>
@@ -125,7 +127,7 @@ export default async function LeadCommandCentrePage() {
 
       <div>
         <h2 className="mb-2 font-semibold">Source funnel</h2>
-        <div className="rounded-xl border border-stone-200 bg-white">
+        <div className="rounded-2xl border border-stone-200 bg-surface-raised shadow-[0_2px_10px_-2px_rgba(180,90,30,0.12)]">
           <Table>
             <TableHeader>
               <TableRow>
@@ -150,7 +152,7 @@ export default async function LeadCommandCentrePage() {
         <p className="mb-2 text-xs text-stone-500">
           Same shape as GET /api/leads/v2/assignment/workload (max queue {rules.maxQueuePerTelecaller}).
         </p>
-        <div className="rounded-xl border border-stone-200 bg-white">
+        <div className="rounded-2xl border border-stone-200 bg-surface-raised shadow-[0_2px_10px_-2px_rgba(180,90,30,0.12)]">
           <Table>
             <TableHeader>
               <TableRow>

@@ -151,7 +151,7 @@ export default async function AdminLeadsAnalyticsPage() {
 
       <div>
         <h2 className="mb-2 font-semibold">Conversion by source</h2>
-        <div className="rounded-xl border border-stone-200 bg-white">
+        <div className="rounded-2xl border border-stone-200 bg-surface-raised shadow-[0_2px_10px_-2px_rgba(180,90,30,0.12)]">
           <Table>
             <TableHeader>
               <TableRow>
@@ -184,7 +184,7 @@ export default async function AdminLeadsAnalyticsPage() {
 
       <div>
         <h2 className="mb-2 font-semibold">Conversion by tier</h2>
-        <div className="rounded-xl border border-stone-200 bg-white">
+        <div className="rounded-2xl border border-stone-200 bg-surface-raised shadow-[0_2px_10px_-2px_rgba(180,90,30,0.12)]">
           <Table>
             <TableHeader>
               <TableRow>
@@ -221,7 +221,7 @@ export default async function AdminLeadsAnalyticsPage() {
           Monthly entry cohort by createdAt. Conversion windows 30/60/90 days from entry.
           Windows not yet elapsed show in progress, not 0%.
         </p>
-        <div className="rounded-xl border border-stone-200 bg-white">
+        <div className="rounded-2xl border border-stone-200 bg-surface-raised shadow-[0_2px_10px_-2px_rgba(180,90,30,0.12)]">
           <Table>
             <TableHeader>
               <TableRow>
@@ -262,7 +262,7 @@ export default async function AdminLeadsAnalyticsPage() {
 
       <div>
         <h2 className="mb-2 font-semibold">Telecaller leaderboard</h2>
-        <div className="rounded-xl border border-stone-200 bg-white">
+        <div className="rounded-2xl border border-stone-200 bg-surface-raised shadow-[0_2px_10px_-2px_rgba(180,90,30,0.12)]">
           <Table>
             <TableHeader>
               <TableRow>

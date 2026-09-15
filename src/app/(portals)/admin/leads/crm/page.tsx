@@ -48,7 +48,7 @@ export default async function AdminLeadCrmMonitorPage() {
             ).
           </p>
         </div>
-        <Link href="/admin/leads" className="text-sm text-emerald-900 hover:underline">
+        <Link href="/admin/leads" className="text-sm text-brand-800 hover:underline">
           ← Leads
         </Link>
       </div>

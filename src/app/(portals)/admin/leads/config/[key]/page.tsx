@@ -34,7 +34,7 @@ export default async function LeadConfigKeyPage({
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/admin/leads/config" className="text-sm text-emerald-900 hover:underline">
+        <Link href="/admin/leads/config" className="text-sm text-brand-800 hover:underline">
           ← All keys
         </Link>
         <h1 className="mt-2 text-2xl font-semibold">{CONFIG_LABELS[raw]}</h1>

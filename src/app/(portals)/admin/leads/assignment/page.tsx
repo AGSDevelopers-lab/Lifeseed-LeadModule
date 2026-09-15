@@ -13,7 +13,7 @@ export default async function AssignmentCentrePage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/admin/leads" className="text-sm text-emerald-900 hover:underline">
+        <Link href="/admin/leads" className="text-sm text-brand-800 hover:underline">
           Back to leads
         </Link>
         <h1 className="text-2xl font-semibold">Assignment Centre</h1>

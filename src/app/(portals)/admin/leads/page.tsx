@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { LeadStatus } from "@prisma/client";
+import { Eye } from "lucide-react";
 
 import {
   Table,
@@ -79,11 +80,6 @@ export default async function AdminLeadsPage({
     countScopedLeads(actor, { status: LeadStatus.CONVERTED }),
   ]);
 
-  const canExport = permissionGranted(
-    permissionsForRoles(session.roles),
-    "lead.export",
-  );
-
   const qs = (next: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
     const merged = {
@@ -104,82 +100,37 @@ export default async function AdminLeadsPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Leads</h1>
-          <p className="text-sm text-stone-600">
-            Funnel: {newCount} lead → {contacted} contacted → {counselled}{" "}
-            counselled → {converted} converted
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-3 text-sm">
-          <Link href="/admin/leads/analytics" className="text-emerald-900 hover:underline">
-            Analytics
-          </Link>
-          <Link href="/admin/leads/command-centre" className="text-emerald-900 hover:underline">
-            Command centre
-          </Link>
-          <Link href="/admin/leads/sla-monitor" className="text-emerald-900 hover:underline">
-            SLA monitor
-          </Link>
-          <Link href="/admin/leads/audit" className="text-emerald-900 hover:underline">
-            Audit
-          </Link>
-          <Link href="/admin/leads/campaigns" className="text-emerald-900 hover:underline">
-            Campaigns
-          </Link>
-          <Link href="/admin/leads/crm" className="text-emerald-900 hover:underline">
-            CRM sync
-          </Link>
-          <Link href="/admin/leads/do-not-call" className="text-emerald-900 hover:underline">
-            Do Not Call
-          </Link>
-          <Link href="/admin/leads/config" className="text-emerald-900 hover:underline">
-            Config
-          </Link>
-          <Link href="/admin/leads/assignment" className="text-emerald-900 hover:underline">
-            Assignment
-          </Link>
-          <Link href="/admin/leads/notifications/templates" className="text-emerald-900 hover:underline">
-            Templates
-          </Link>
-          <Link href="/admin/leads/notifications/delivery-log" className="text-emerald-900 hover:underline">
-            Delivery log
-          </Link>
-          {canExport && (
-            <a
-              href="/api/leads/export"
-              className="text-emerald-900 hover:underline"
-            >
-              Export CSV
-            </a>
-          )}
-        </div>
+      <div>
+        <h1 className="text-2xl font-semibold">Leads</h1>
+        <p className="text-sm text-stone-600">
+          Funnel: {newCount} lead → {contacted} contacted → {counselled}{" "}
+          counselled → {converted} converted
+        </p>
       </div>
 
       <div className="flex flex-wrap gap-3 text-sm">
         <span className="text-stone-500">SLA:</span>
         <Link
           href={`/admin/leads${qs({ sort: slaUrgency ? undefined : "sla" })}`}
-          className={slaUrgency ? "font-medium text-emerald-900" : "text-emerald-900 hover:underline"}
+          className={slaUrgency ? "font-medium text-brand-800" : "text-brand-800 hover:underline"}
         >
           {slaUrgency ? "Urgency sort on" : "Sort by SLA urgency"}
         </Link>
         <Link
           href={`/admin/leads${qs({ sla: slaAtRisk ? undefined : "at-risk" })}`}
-          className={slaAtRisk ? "font-medium text-amber-800" : "text-emerald-900 hover:underline"}
+          className={slaAtRisk ? "font-medium text-amber-800" : "text-brand-800 hover:underline"}
         >
           At-risk (≤2h)
         </Link>
         <Link
           href={`/admin/leads${qs({ sla: slaBreached ? undefined : "breached" })}`}
-          className={slaBreached ? "font-medium text-red-800" : "text-emerald-900 hover:underline"}
+          className={slaBreached ? "font-medium text-red-800" : "text-brand-800 hover:underline"}
         >
           Breached
         </Link>
       </div>
 
-      <div className="rounded-xl border border-stone-200 bg-white">
+      <div className="rounded-2xl border border-stone-200 bg-surface-raised shadow-[0_2px_10px_-2px_rgba(180,90,30,0.12)]">
         <Table>
           <TableHeader>
             <TableRow>
@@ -199,12 +150,19 @@ export default async function AdminLeadsPage({
                 <TableCell>
                   <Link
                     href={`/admin/leads/${r.id}`}
-                    className="font-medium text-emerald-900 hover:underline"
+                    className="inline-flex max-w-[12rem] items-center gap-1 overflow-hidden text-ellipsis whitespace-nowrap font-medium text-brand-800 hover:underline"
+                    title={r.code.toString()}
                   >
+                    <Eye className="h-4 w-4 shrink-0" />
                     {r.code.toString()}
                   </Link>
                 </TableCell>
-                <TableCell>{r.props.contact.fullName ?? "—"}</TableCell>
+                <TableCell
+                  className="max-w-[12rem] overflow-hidden text-ellipsis whitespace-nowrap"
+                  title={r.props.contact.fullName ?? "—"}
+                >
+                  {r.props.contact.fullName ?? "—"}
+                </TableCell>
                 <TableCell className="text-xs">{r.props.personType}</TableCell>
                 <TableCell className="text-xs">{r.props.source}</TableCell>
                 <TableCell>{r.props.latestScore?.tier ?? "—"}</TableCell>

@@ -49,7 +49,7 @@ export default async function LeadAuditPage({
         <h1 className="text-2xl font-semibold">Lead audit</h1>
         <p className="text-sm text-stone-600">
           Read-only, lead-module AuditLog.{" "}
-          <Link href="/admin/leads" className="text-emerald-900 hover:underline">
+          <Link href="/admin/leads" className="text-brand-800 hover:underline">
             Back to leads
           </Link>
         </p>
@@ -89,7 +89,7 @@ export default async function LeadAuditPage({
           Filter
         </button>
       </form>
-      <div className="rounded-xl border border-stone-200 bg-white">
+      <div className="rounded-2xl border border-stone-200 bg-surface-raised shadow-[0_2px_10px_-2px_rgba(180,90,30,0.12)]">
         <Table>
           <TableHeader>
             <TableRow>
@@ -134,7 +134,7 @@ export default async function LeadAuditPage({
             ...(sp.to ? { to: sp.to } : {}),
             cursor: page.nextCursor,
           }).toString()}`}
-          className="text-sm text-emerald-900 hover:underline"
+          className="text-sm text-brand-800 hover:underline"
         >
           Next page
         </Link>
