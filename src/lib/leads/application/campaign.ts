@@ -11,7 +11,7 @@ import { CampaignStatus as DomainCampaignStatus, LeadSource as DomainLeadSource 
 import type { ActorContext } from "@/lib/leads/domain/ports/shared";
 import { isLegalPatchStatus, requiredNextStatus } from "@/lib/leads/domain/attribution/rules";
 
-type Db = PrismaClient;
+type Db = typeof defaultPrisma;
 
 const SOURCES = new Set<string>(Object.values(DomainLeadSource));
 
@@ -138,10 +138,10 @@ export async function patchCampaign(
       endAt: input.endAt,
       budgetInr: money(input.budgetInr),
       actualSpendInr: money(input.actualSpendInr),
-      creativeRefs: input.creativeRefs === undefined ? undefined : input.creativeRefs,
-      landingPageUrls: input.landingPageUrls === undefined ? undefined : input.landingPageUrls,
+      creativeRefs: input.creativeRefs === undefined ? undefined : (input.creativeRefs === null ? Prisma.DbNull : input.creativeRefs),
+      landingPageUrls: input.landingPageUrls === undefined ? undefined : (input.landingPageUrls === null ? Prisma.DbNull : input.landingPageUrls),
       referralPartnerId: input.referralPartnerId,
-      utmDefaults: input.utmDefaults === undefined ? undefined : input.utmDefaults,
+      utmDefaults: input.utmDefaults === undefined ? undefined : (input.utmDefaults === null ? Prisma.DbNull : input.utmDefaults),
       notes: input.notes,
       status: input.status === DomainCampaignStatus.PAUSED ? CampaignStatus.PAUSED : undefined,
     },

@@ -357,7 +357,7 @@ export async function mergeDuplicateCase(input: MergeDuplicateInput) {
       now,
     });
 
-    const copied = await copyActivities(tx, winnerLeadId, loserLeadId, strategy);
+    const copied = await copyActivities(tx as any, winnerLeadId, loserLeadId, strategy);
     await tx.leadMerge.update({
       where: { id: mergeRow.id },
       data: { activitiesCopiedCount: copied },

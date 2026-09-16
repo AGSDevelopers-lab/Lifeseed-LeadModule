@@ -33,6 +33,6 @@ export async function auditCrmAction(
     action,
     entityType: "CrmSyncQueue",
     entityId,
-    afterJson: after,
+    afterJson: after as any,
   });
 }

@@ -26,7 +26,7 @@ import { resolveSystemUserId } from "@/lib/leads/application/backfill-lead-conve
 const MAX_NO_SHOW_ATTEMPTS = 3;
 
 export async function systemLeadActor(): Promise<ActorContext> {
-  const userId = await resolveSystemUserId(prisma);
+  const userId = await resolveSystemUserId(prisma as any);
   return {
     userId,
     roles: ["BANK_SUPER_ADMIN"],

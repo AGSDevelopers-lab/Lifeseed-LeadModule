@@ -63,7 +63,7 @@ export async function handleBookCounselling(leadId: string, request: Request) {
       meetingLocation: parsed.data.meetingLocation ?? null,
       durationMinutes: parsed.data.durationMinutes,
     });
-    return NextResponse.json({ ok: true, transitionId: result.result.id });
+    return NextResponse.json({ ok: true, transitionId: result.result.transitionId });
   } catch (err) {
     return leadV2Error(err);
   }
@@ -121,7 +121,7 @@ export async function handleRescheduleCounselling(bookingId: string, request: Re
       scheduledAt: new Date(parsed.data.scheduledAt),
       mode: parsed.data.mode ?? loaded.booking.mode,
     });
-    return NextResponse.json({ ok: true, transitionId: result.result.id });
+    return NextResponse.json({ ok: true, transitionId: result.result.transitionId });
   } catch (err) {
     return leadV2Error(err);
   }
@@ -144,7 +144,7 @@ export async function handleCancelCounselling(bookingId: string, request: Reques
     const result = await cancelCounsellingBooking(loaded.booking.leadId, actor, {
       reason: json.reason,
     });
-    return NextResponse.json({ ok: true, transitionId: result.result.id });
+    return NextResponse.json({ ok: true, transitionId: result.result.transitionId });
   } catch (err) {
     return leadV2Error(err);
   }
@@ -181,7 +181,7 @@ export async function handleRecordSession(bookingId: string, request: Request) {
       parsed.data.attendance === "ATTENDED" ? "attended" : "no_show",
       { notes: parsed.data.notes },
     );
-    return NextResponse.json({ ok: true, transitionId: result.result.id });
+    return NextResponse.json({ ok: true, transitionId: result.result.transitionId });
   } catch (err) {
     return leadV2Error(err);
   }
@@ -219,7 +219,7 @@ export async function handleRecordOutcome(sessionId: string, request: Request) {
       notes: parsed.data.rationale,
       dueAt: parsed.data.dueAt ? new Date(parsed.data.dueAt) : null,
     });
-    return NextResponse.json({ ok: true, transitionId: result.result.id });
+    return NextResponse.json({ ok: true, transitionId: result.result.transitionId });
   } catch (err) {
     return leadV2Error(err);
   }

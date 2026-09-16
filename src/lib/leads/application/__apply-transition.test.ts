@@ -72,8 +72,8 @@ describe("applyTransition double-write + rollback", () => {
 
   it("forcePersist writes via persistBundle when SM flag is off (T-21/T-30 ticks)", async () => {
     process.env.LEAD_STATE_MACHINE_ENABLED = "off";
-    process.env.NODE_ENV = "production";
-    process.env.VERCEL_ENV = "production";
+    (process.env as any).NODE_ENV = "production";
+    (process.env as any).VERCEL_ENV = "production";
     const store = new InMemoryTransitionStore();
     const lead = aLead({ status: LeadStatus.COUNSELLING_NO_SHOW });
     store.seed(lead);
@@ -95,8 +95,8 @@ describe("applyTransition double-write + rollback", () => {
 
   it("does not persist when SM flag is off and forcePersist is absent", async () => {
     process.env.LEAD_STATE_MACHINE_ENABLED = "off";
-    process.env.NODE_ENV = "production";
-    process.env.VERCEL_ENV = "production";
+    (process.env as any).NODE_ENV = "production";
+    (process.env as any).VERCEL_ENV = "production";
     const store = new InMemoryTransitionStore();
     const lead = aLead({ status: LeadStatus.ASSIGNED });
     store.seed(lead);

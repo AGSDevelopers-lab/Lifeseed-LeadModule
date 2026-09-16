@@ -26,8 +26,8 @@ const MARKER = "b15-attr-20990913";
 
 describe.skipIf(!DATABASE_URL)("B15 campaign + attribution (Postgres)", () => {
   const dbIt = (name: string, fn: () => Promise<void>) => it(name, fn, 60_000);
-  const prisma = new PrismaClient();
-  const prismaB = new PrismaClient();
+  const prisma = new PrismaClient() as any;
+  const prismaB = new PrismaClient() as any;
   let userId = "";
   const marketing = {
     userId: "",
@@ -45,7 +45,7 @@ describe.skipIf(!DATABASE_URL)("B15 campaign + attribution (Postgres)", () => {
       where: { OR: [{ fullName: MARKER }, { leadCode: { startsWith: "LED-B15-" } }] },
       select: { id: true },
     });
-    const ids = leads.map((l) => l.id);
+    const ids = leads.map((l: any) => l.id);
     if (ids.length) {
       await prisma.slaSchedule.deleteMany({ where: { entityId: { in: ids } } });
       await prisma.leadOutboxEvent.deleteMany({ where: { aggregateId: { in: ids } } });
@@ -174,8 +174,8 @@ describe.skipIf(!DATABASE_URL)("B15 campaign + attribution (Postgres)", () => {
     expect(["A", "B"]).toContain(rows[0].firstTouchMedium);
     const history = await prisma.leadAttributionHistory.findMany({ where: { leadId: lead.id } });
     expect(history).toHaveLength(2);
-    expect(history.filter((h) => h.touchType === "FIRST")).toHaveLength(1);
-    expect(history.filter((h) => h.touchType === "SUBSEQUENT")).toHaveLength(1);
+    expect(history.filter((h: any) => h.touchType === "FIRST")).toHaveLength(1);
+    expect(history.filter((h: any) => h.touchType === "SUBSEQUENT")).toHaveLength(1);
   });
 
   dbIt("G+H sequential last-touch and append-only history", async () => {
@@ -193,7 +193,7 @@ describe.skipIf(!DATABASE_URL)("B15 campaign + attribution (Postgres)", () => {
     expect(hist[0].touchType).toBe("FIRST");
     expect(hist[1].touchType).toBe("SUBSEQUENT");
     expect(hist[2].touchType).toBe("SUBSEQUENT");
-    expect(hist.map((h) => h.medium)).toEqual(["1", "2", "3"]);
+    expect(hist.map((h: any) => h.medium)).toEqual(["1", "2", "3"]);
   });
 
   dbIt("G+H concurrent subsequent: no dropped/dup history, lastTouch matches latest history", async () => {

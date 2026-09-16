@@ -8,7 +8,7 @@ import { seedB12NotificationTemplateStructure } from "../src/lib/leads/applicati
 async function main() {
   const prisma = new PrismaClient();
   try {
-    const summary = await seedB12NotificationTemplateStructure(prisma);
+    const summary = await seedB12NotificationTemplateStructure(prisma as any);
     console.log(JSON.stringify({ ok: true, ...summary }));
   } finally {
     await prisma.$disconnect();

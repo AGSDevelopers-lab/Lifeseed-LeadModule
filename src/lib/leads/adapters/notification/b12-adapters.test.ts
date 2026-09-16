@@ -51,7 +51,7 @@ describe("B12 adapters (mocked HTTP)", () => {
   it("SMS-Magic uses injected fixture URL + fake fetch when flags on", async () => {
     process.env.LEAD_NOTIFICATION_PORT_ENABLED = "on";
     process.env.LEAD_SMS_ENABLED = "on";
-    const fetchFn = vi.fn(async () =>
+    const fetchFn = vi.fn(async (...args: any[]) =>
       new Response(JSON.stringify({ id: "sm-1" }), { status: 200 }),
     );
     const adapter = new SmsMagicAdapter({
@@ -93,7 +93,7 @@ describe("B12 adapters (mocked HTTP)", () => {
       data: { body: "{{body}}", subject: "s" },
     });
     expect(built.url).toBe("https://api.resend.com/emails");
-    const fetchFn = vi.fn(async () => new Response(JSON.stringify({ id: "re_1" }), { status: 200 }));
+    const fetchFn = vi.fn(async (...args: any[]) => new Response(JSON.stringify({ id: "re_1" }), { status: 200 }));
     const adapter = new ResendEmailAdapter({ apiKey: "re_test", from: "a@b.c", fetchFn: fetchFn as never });
     const result = await adapter.send({
       ...sendInput,
@@ -117,7 +117,7 @@ describe("B12 adapters (mocked HTTP)", () => {
     });
     expect(built.url).toBe("https://graph.facebook.com/v21.0/123/messages");
     const fetchFn = vi.fn(
-      async () => new Response(JSON.stringify({ messages: [{ id: "wamid.1" }] }), { status: 200 }),
+      async (...args: any[]) => new Response(JSON.stringify({ messages: [{ id: "wamid.1" }] }), { status: 200 }),
     );
     const adapter = new MetaWhatsappAdapter({
       token: "t",

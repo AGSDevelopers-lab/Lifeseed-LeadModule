@@ -4,24 +4,24 @@ import { LeadStatus } from "../domain/enums";
 import { LeadOwnershipDeniedError } from "../domain/errors";
 import { aLead } from "../testing/fixtures/aLead";
 
-const applyLeadEvent = vi.fn(async () => ({ result: { nextStatus: "ASSIGNED" } }));
-const byId = vi.fn();
-const listAvailableTelecallers = vi.fn();
-const lookupUserSiteAndActive = vi.fn();
-const countAssignedOpenLeads = vi.fn(async () => 0);
+const applyLeadEvent = vi.fn(async () => ({ result: { nextStatus: "ASSIGNED" } })) as any;
+const byId = vi.fn() as any;
+const listAvailableTelecallers = vi.fn() as any;
+const lookupUserSiteAndActive = vi.fn() as any;
+const countAssignedOpenLeads = vi.fn(async () => 0) as any;
 
 vi.mock("./apply-lead-event", () => ({
-  applyLeadEvent: (...args: unknown[]) => applyLeadEvent(...args),
+  applyLeadEvent: (...args: any[]) => applyLeadEvent(...args),
 }));
 
 vi.mock("../adapters/prisma-lead-repository", () => ({
   prismaLeadRepository: { byId: (...args: unknown[]) => byId(...args) },
-  countAssignedOpenLeads: (...args: unknown[]) => countAssignedOpenLeads(...args),
+  countAssignedOpenLeads: (...args: any[]) => countAssignedOpenLeads(...args),
 }));
 
 vi.mock("../adapters/prisma-assignment-directory", () => ({
   createPrismaAssignmentDirectory: async () => ({
-    listAvailableTelecallers: (...args: unknown[]) => listAvailableTelecallers(...args),
+    listAvailableTelecallers: (...args: any[]) => listAvailableTelecallers(...args),
   }),
   loadAssignmentRules: async () => ({
     maxQueuePerTelecaller: 20,
@@ -31,7 +31,7 @@ vi.mock("../adapters/prisma-assignment-directory", () => ({
     crossSiteOverridePolicy: "assignment_override",
     rotationStrategy: "least_open_then_user_id",
   }),
-  lookupUserSiteAndActive: (...args: unknown[]) => lookupUserSiteAndActive(...args),
+  lookupUserSiteAndActive: (...args: any[]) => lookupUserSiteAndActive(...args),
 }));
 
 import { assignLeadToUser, reassignLeadToUser } from "./commands";
@@ -73,9 +73,10 @@ describe("B13 commands + flag + config", () => {
     });
     expect(parsed.success).toBe(true);
     if (parsed.success) {
-      expect(parsed.data.siteMatchingPolicy).toBe("require_match");
-      expect(parsed.data.crossSiteOverridePolicy).toBe("assignment_override");
-      expect(parsed.data.rotationStrategy).toBe("least_open_then_user_id");
+      const data = parsed.data as any;
+      expect(data.siteMatchingPolicy).toBe("require_match");
+      expect(data.crossSiteOverridePolicy).toBe("assignment_override");
+      expect(data.rotationStrategy).toBe("least_open_then_user_id");
     }
   });
 

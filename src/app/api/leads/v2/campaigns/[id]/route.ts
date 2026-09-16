@@ -67,7 +67,7 @@ export async function PATCH(
       ...b,
       startAt: b.startAt ? new Date(b.startAt) : undefined,
       endAt: b.endAt === undefined ? undefined : b.endAt ? new Date(b.endAt) : null,
-    });
+    } as any);
     return NextResponse.json({ apiVersion: "v2", item });
   } catch (err) {
     return campaignErrorResponse(err);

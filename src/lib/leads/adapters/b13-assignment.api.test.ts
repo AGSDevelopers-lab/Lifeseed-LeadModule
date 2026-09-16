@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const requirePermission = vi.fn();
-const listAvailableTelecallers = vi.fn();
-const loadAssignmentRules = vi.fn(async () => ({
+const requirePermission = vi.fn((...args: any[]) => undefined as any);
+const listAvailableTelecallers = vi.fn((...args: any[]) => undefined as any);
+const loadAssignmentRules = vi.fn(async (...args: any[]) => ({
   maxQueuePerTelecaller: 20,
   autoAssignEnabled: true,
   openStatuses: ["NEW"],
@@ -12,14 +12,14 @@ const loadAssignmentRules = vi.fn(async () => ({
 }));
 
 vi.mock("@/lib/rbac", () => ({
-  requirePermission: (...args: unknown[]) => requirePermission(...args),
+  requirePermission: (...args: any[]) => requirePermission(...args),
 }));
 
 vi.mock("@/lib/leads/adapters/prisma-assignment-directory", () => ({
   createPrismaAssignmentDirectory: async () => ({
-    listAvailableTelecallers: (...args: unknown[]) => listAvailableTelecallers(...args),
+    listAvailableTelecallers: (...args: any[]) => listAvailableTelecallers(...args),
   }),
-  loadAssignmentRules: (...args: unknown[]) => loadAssignmentRules(...args),
+  loadAssignmentRules: (...args: any[]) => loadAssignmentRules(...args),
 }));
 
 import { GET as directoryGet } from "@/app/api/leads/v2/assignment/directory/route";

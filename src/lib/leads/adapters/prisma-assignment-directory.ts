@@ -75,7 +75,7 @@ export async function loadAssignmentRules(): Promise<AssignmentRules> {
 }
 
 export async function createPrismaAssignmentDirectory(
-  db: DirectoryDb = prisma,
+  db: DirectoryDb = prisma as any,
 ): Promise<PrismaAssignmentDirectory> {
   const rules = await loadAssignmentRules();
   return new PrismaAssignmentDirectory(
@@ -87,7 +87,7 @@ export async function createPrismaAssignmentDirectory(
 
 export async function lookupUserSiteAndActive(
   userId: string,
-  db: DirectoryDb = prisma,
+  db: DirectoryDb = prisma as any,
 ): Promise<{ siteId: string | null; isActive: boolean } | null> {
   const row = await db.user.findUnique({
     where: { id: userId },

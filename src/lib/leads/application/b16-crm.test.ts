@@ -13,14 +13,14 @@ import type { LeadOutboxEvent } from "../domain/entities/LeadOutboxEvent";
 describe("B16 CRM flags", () => {
   it("defaults off", () => {
     const env = { CRM_SYNC_ENABLED: undefined, CRM_SYNC_ZOHO_ENABLED: undefined, CRM_SYNC_SALESFORCE_ENABLED: undefined };
-    expect(isCrmSyncEnabled(env as NodeJS.ProcessEnv)).toBe(false);
-    expect(isCrmZohoSyncEnabled(env as NodeJS.ProcessEnv)).toBe(false);
-    expect(isCrmSalesforceSyncEnabled(env as NodeJS.ProcessEnv)).toBe(false);
+    expect(isCrmSyncEnabled(env as any)).toBe(false);
+    expect(isCrmZohoSyncEnabled(env as any)).toBe(false);
+    expect(isCrmSalesforceSyncEnabled(env as any)).toBe(false);
   });
 
   it("accepts true and on", () => {
-    expect(isCrmSyncEnabled({ CRM_SYNC_ENABLED: "true" } as NodeJS.ProcessEnv)).toBe(true);
-    expect(isCrmZohoSyncEnabled({ CRM_SYNC_ZOHO_ENABLED: "on" } as NodeJS.ProcessEnv)).toBe(true);
+    expect(isCrmSyncEnabled({ CRM_SYNC_ENABLED: "true" } as any)).toBe(true);
+    expect(isCrmZohoSyncEnabled({ CRM_SYNC_ZOHO_ENABLED: "on" } as any)).toBe(true);
   });
 });
 

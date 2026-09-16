@@ -65,7 +65,7 @@ describe("B12 templates", () => {
         findMany: vi.fn(),
         findFirst: vi.fn(async () => ({ version: 2 })),
         findUnique: vi.fn(),
-        create: vi.fn(async ({ data }: { data: { version: number } }) => ({
+        create: vi.fn(async ({ data }: { data: any }) => ({
           id: "n",
           version: data.version,
         })),

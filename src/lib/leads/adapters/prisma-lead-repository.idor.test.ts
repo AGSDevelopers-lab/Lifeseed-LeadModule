@@ -57,7 +57,7 @@ function prismaRow(overrides: Record<string, unknown> = {}) {
 }
 
 function makeRepo(row: ReturnType<typeof prismaRow> | null, audit: LeadAccessAuditor) {
-  const findMany = vi.fn(async () => (row ? [row as never] : []));
+  const findMany = vi.fn(async (...args: any[]) => (row ? [row as never] : []));
   const db: LeadReadDb = {
     lead: {
       findUnique: vi.fn(async () => row as never),
@@ -136,7 +136,7 @@ describe("PrismaLeadRepository.byId IDOR", () => {
       siteId: "site-kol",
     });
     expect(page.items).toHaveLength(1);
-    const arg = findMany.mock.calls[0][0] as { where: { assignedTelecallerId: string } };
+    const arg = findMany.mock.calls[0][0] as any as { where: { assignedTelecallerId: string } };
     expect(arg.where.assignedTelecallerId).toBe("tele-a");
   });
 
@@ -147,7 +147,7 @@ describe("PrismaLeadRepository.byId IDOR", () => {
       { userId: "ops", roles: ["OPS_MANAGER"], siteId: "site-kol" },
       { orderBy: "slaResponseDueAt" },
     );
-    const arg = findMany.mock.calls[0][0] as {
+    const arg = findMany.mock.calls[0][0] as any as {
       orderBy: Array<Record<string, string>>;
     };
     expect(arg.orderBy[0]).toEqual({ slaResponseDueAt: "asc" });

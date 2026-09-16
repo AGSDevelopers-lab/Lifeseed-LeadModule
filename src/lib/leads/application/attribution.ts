@@ -15,7 +15,7 @@ import { LeadSource as DomainLeadSource } from "@/lib/leads/domain/enums";
 import type { LeadSource as LeadSourceT } from "@/lib/leads/domain/enums";
 import type { ActorContext } from "@/lib/leads/domain/ports/shared";
 
-type Db = PrismaClient;
+type Db = typeof defaultPrisma;
 
 export type CaptureTouchInput = {
   leadId: string;
@@ -168,7 +168,7 @@ export async function captureTouch(input: CaptureTouchInput): Promise<void> {
   const fields = fieldsFromInput(input, campaignId);
 
   try {
-    await db.$transaction(async (tx) => {
+    await db.$transaction(async (tx: any) => {
       await tx.leadAttribution.create({
         data: {
           leadId: input.leadId,
@@ -181,7 +181,7 @@ export async function captureTouch(input: CaptureTouchInput): Promise<void> {
     });
   } catch (err) {
     if (!isP2002(err)) throw err;
-    await db.$transaction(async (tx) => {
+    await db.$transaction(async (tx: any) => {
       await lockAttributionRow(tx, input.leadId);
       await tx.leadAttributionHistory.create({
         data: historyWrite(input.leadId, fields, at, false),

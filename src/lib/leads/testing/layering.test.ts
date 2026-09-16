@@ -4,7 +4,12 @@ import { fileURLToPath } from "node:url";
 import { Linter } from "eslint";
 import { describe, expect, it } from "vitest";
 
-import { FORBIDDEN_DOMAIN_IMPORT_SNIPPETS } from "./negative/forbidden-domain-imports";
+const FORBIDDEN_DOMAIN_IMPORT_SNIPPETS: Record<string, string> = {
+  prisma: "import { PrismaClient } from '@prisma/client';",
+  next: "import { useRouter } from 'next/router';",
+  react: "import { useState } from 'react';",
+  adapter: "import { someAdapter } from '../adapters/foo';"
+};
 
 const filename = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -64,7 +69,7 @@ describe("ESLint layering guard", () => {
   it.each(Object.entries(FORBIDDEN_DOMAIN_IMPORT_SNIPPETS))(
     "rejects %s import inside domain",
     (_name, snippet) => {
-      const messages = lintAsDomain(snippet);
+      const messages = lintAsDomain(snippet as string);
       expect(messages.some((m) => m.ruleId === "no-restricted-imports")).toBe(true);
     },
   );

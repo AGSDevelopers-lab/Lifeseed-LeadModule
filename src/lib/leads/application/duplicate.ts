@@ -31,8 +31,8 @@ export async function resolveMatchRules(): Promise<DuplicateMatchRules> {
     DEFAULT_DUPLICATE_MATCH_RULES,
   ).then((payload) =>
     loadDuplicateMatchRules({
-      getActive: async () => payload,
-      read: async () => payload,
+      getActive: async () => payload as any,
+      read: async () => payload as any,
       currentVersion: async () => 1,
       history: async () => [],
     }),

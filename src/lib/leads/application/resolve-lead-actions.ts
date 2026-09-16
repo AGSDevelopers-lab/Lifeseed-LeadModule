@@ -41,7 +41,7 @@ async function advisoryAllowed(
   permission: string,
   extra: {
     payload?: TransitionContext["payload"];
-    facts?: Parameters<typeof buildGuardFacts>[0];
+    facts?: Partial<Parameters<typeof buildGuardFacts>[0]>;
   } = {},
 ): Promise<boolean> {
   const hasPermission = await actorHasPerm(actor, permission);

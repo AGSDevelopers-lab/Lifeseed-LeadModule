@@ -89,7 +89,7 @@ function adapterEnabled(
     LEAD_SMS_ENABLED: process.env.LEAD_SMS_ENABLED,
     LEAD_EMAIL_ENABLED: process.env.LEAD_EMAIL_ENABLED,
     LEAD_WHATSAPP_ENABLED: process.env.LEAD_WHATSAPP_ENABLED,
-  } as NodeJS.ProcessEnv);
+  } as any);
 }
 
 export class DncGatedNotificationPort implements NotificationPort {

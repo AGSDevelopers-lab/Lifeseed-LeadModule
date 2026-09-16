@@ -1,7 +1,7 @@
 export type LeadStateMachineMode = "off" | "shadow" | "on" | "strict";
 
 export function getLeadStateMachineMode(
-  env: NodeJS.ProcessEnv = process.env,
+  env: Record<string, string | undefined> = process.env,
 ): LeadStateMachineMode {
   const raw = env.LEAD_STATE_MACHINE_ENABLED;
   if (raw === "off" || raw === "shadow" || raw === "on" || raw === "strict") {
@@ -38,7 +38,7 @@ export type LeadConversionPortMode = "off" | "on";
  * Default `on` in non-production for shadow testing.
  */
 export function isLeadConversionPortEnabled(
-  env: NodeJS.ProcessEnv = process.env,
+  env: Record<string, string | undefined> = process.env,
 ): boolean {
   const raw = env.LEAD_CONVERSION_PORT_ENABLED;
   if (raw === "on") return true;
@@ -60,21 +60,21 @@ export function getLeadNotificationPortMode(env?: {
 }
 
 /** B12 per-channel flags. Default OFF unless the exact value `on` is set. */
-export function isLeadSmsEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isLeadSmsEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return (env.LEAD_SMS_ENABLED ?? process.env.LEAD_SMS_ENABLED) === "on";
 }
 
-export function isLeadEmailEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isLeadEmailEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return (env.LEAD_EMAIL_ENABLED ?? process.env.LEAD_EMAIL_ENABLED) === "on";
 }
 
-export function isLeadWhatsappEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isLeadWhatsappEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return (env.LEAD_WHATSAPP_ENABLED ?? process.env.LEAD_WHATSAPP_ENABLED) === "on";
 }
 
 export function isLeadOutboundChannelFlagOn(
   channel: "EMAIL" | "SMS" | "WHATSAPP" | "IN_APP",
-  env: NodeJS.ProcessEnv = process.env,
+  env: Record<string, string | undefined> = process.env,
 ): boolean {
   if (channel === "IN_APP") return true;
   if (channel === "SMS") return isLeadSmsEnabled(env);
@@ -85,7 +85,7 @@ export function isLeadOutboundChannelFlagOn(
 /** Port mode + channel flag must both allow I/O before a vendor adapter may network. */
 export function mayDispatchVendorAdapter(
   channel: "EMAIL" | "SMS" | "WHATSAPP" | "IN_APP",
-  env: NodeJS.ProcessEnv = process.env,
+  env: Record<string, string | undefined> = process.env,
 ): boolean {
   const mode = getLeadNotificationPortMode(env);
   if (mode === "off") return false;
@@ -99,7 +99,7 @@ export function mayDispatchVendorAdapter(
  * Default OFF — never activate for production without Founder cutover.
  * When off, legacy round-robin in lead-assignment.ts is unchanged.
  */
-export function isLeadAssignmentV2Enabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isLeadAssignmentV2Enabled(env: Record<string, string | undefined> = process.env): boolean {
   return (env.LEAD_ASSIGNMENT_V2_ENABLED ?? process.env.LEAD_ASSIGNMENT_V2_ENABLED) === "on";
 }
 
@@ -107,7 +107,7 @@ export function isLeadAssignmentV2Enabled(env: NodeJS.ProcessEnv = process.env):
  * B14 DuplicateCase detection + review merge. Default OFF.
  * Never activate for production without Founder cutover.
  */
-export function isLeadDuplicateEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isLeadDuplicateEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return (env.LEAD_DUPLICATE_ENABLED ?? process.env.LEAD_DUPLICATE_ENABLED) === "on";
 }
 
@@ -116,7 +116,7 @@ export function isLeadDuplicateEnabled(env: NodeJS.ProcessEnv = process.env): bo
  * Gates captureTouch on intake only — Campaign CRUD and CAC are RBAC-gated, not flag-gated.
  * Never activate for production without Founder cutover.
  */
-export function isLeadAttributionEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isLeadAttributionEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return (env.LEAD_ATTRIBUTION_ENABLED ?? process.env.LEAD_ATTRIBUTION_ENABLED) === "on";
 }
 
@@ -126,7 +126,7 @@ export type LeadFollowUpMode = "off" | "on";
  * Default `off` in production (safe rollout).
  * Default `on` in non-production.
  */
-export function isLeadFollowUpEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isLeadFollowUpEnabled(env: Record<string, string | undefined> = process.env): boolean {
   const raw = env.LEAD_FOLLOWUP_ENABLED;
   if (raw === "on") return true;
   if (raw === "off") return false;
@@ -141,7 +141,7 @@ export function isLeadFollowUpEnabled(env: NodeJS.ProcessEnv = process.env): boo
  * Default ON. Must not gate authoritative counselling writes.
  */
 export function isLeadCounsellingHistoryEnabled(
-  env: NodeJS.ProcessEnv = process.env,
+  env: Record<string, string | undefined> = process.env,
 ): boolean {
   const raw = env.LEAD_COUNSELLING_HISTORY_ENABLED;
   if (raw === "off") return false;
@@ -156,17 +156,17 @@ function envFlagTrue(raw: string | undefined): boolean {
  * Master CRM sync worker switch. Default OFF.
  * Existing System A used `CRM_SYNC_ENABLED === "true"`; both `true` and `on` are accepted.
  */
-export function isCrmSyncEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isCrmSyncEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return envFlagTrue(env.CRM_SYNC_ENABLED ?? process.env.CRM_SYNC_ENABLED);
 }
 
 /** Per-provider flag. Default OFF. Worker idles for that provider when off. */
-export function isCrmZohoSyncEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isCrmZohoSyncEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return envFlagTrue(env.CRM_SYNC_ZOHO_ENABLED ?? process.env.CRM_SYNC_ZOHO_ENABLED);
 }
 
 /** Per-provider flag. Default OFF. Worker idles for that provider when off. */
-export function isCrmSalesforceSyncEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isCrmSalesforceSyncEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return envFlagTrue(
     env.CRM_SYNC_SALESFORCE_ENABLED ?? process.env.CRM_SYNC_SALESFORCE_ENABLED,
   );
@@ -177,13 +177,13 @@ export function isCrmSalesforceSyncEnabled(env: NodeJS.ProcessEnv = process.env)
  * Default OFF everywhere (including dev/staging) unless the exact value `on` is set.
  * Never activate in production without a separate Founder decision.
  */
-export function isLead360Enabled(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isLead360Enabled(env: Record<string, string | undefined> = process.env): boolean {
   return (env.LEAD_360_ENABLED ?? process.env.LEAD_360_ENABLED) === "on";
 }
 
 export function isCrmProviderSyncEnabled(
   target: "ZOHO" | "SALESFORCE",
-  env: NodeJS.ProcessEnv = process.env,
+  env: Record<string, string | undefined> = process.env,
 ): boolean {
   if (target === "ZOHO") return isCrmZohoSyncEnabled(env);
   return isCrmSalesforceSyncEnabled(env);
@@ -191,7 +191,7 @@ export function isCrmProviderSyncEnabled(
 
 /** Queue enqueue targets (canonical path). Default ZOHO. */
 export function crmSyncEnqueueTargets(
-  env: NodeJS.ProcessEnv = process.env,
+  env: Record<string, string | undefined> = process.env,
 ): Array<"ZOHO" | "SALESFORCE"> {
   const raw = env.CRM_SYNC_TARGETS ?? process.env.CRM_SYNC_TARGETS ?? "ZOHO";
   const parts = raw
